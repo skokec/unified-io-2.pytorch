@@ -97,6 +97,7 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
 
       # Other
       is_training=False,
+      raw_features_fn=None,
   ) -> Dict[str, np.ndarray]:
     """General pre-processing function
 
@@ -302,7 +303,12 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
     if resize_meta:
       features["meta/image_info"] = resize_meta[0]
 
+
     features["text_inputs"] = text_inputs
+
+    if raw_features_fn is not None:
+      features = raw_features_fn(features)
+
     features = self.unified_io_preprocessor(features)
     return {k: v.numpy() for k, v in features.items()}
 

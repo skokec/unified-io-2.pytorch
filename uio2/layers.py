@@ -368,7 +368,7 @@ def make_decoder_mask(token_mask,
 
   # Padding mask
   token_mask = token_mask > 0
-  mask = torch.logical_and(mask, token_mask[:, None, :])
+  mask = torch.logical_and(mask.repeat([int(token_mask.shape[0]/mask.shape[0]),1,1]), token_mask[:, None, :])
   mask = torch.logical_and(mask, token_mask[:, :, None,])
 
   if decoder_segment_ids is not None:

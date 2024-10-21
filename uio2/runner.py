@@ -136,6 +136,24 @@ def extract_keypoints(text, image_info):
   points = np.concatenate([points, labels.astype(points.dtype)[:, None]], -1)
   return points, invalid
 
+individual_keypoints_re=re.compile(r"<extra_id_([0-9]+)> <extra_id_([0-9]+)>")
+
+def extract_individual_keypoints(text, image_info, ):
+  """Extract keypoint prediction from UIO output text"""
+  points = []
+  for id1, id2 in individual_keypoints_re.findall(text):
+    ids = (int(id1), int(id2))
+    if all(200 <= x < 1200 for x in ids):
+      points.append(ids)
+
+  points = extra_id_to_float(np.array(points))
+  points *= config.IMAGE_INPUT_SIZE[0]
+
+  if image_info is not None:
+    points = undo_box_preprocessing(np.tile(points, [1, 2]), image_info)[:, :2]
+  points = points[:, ::-1]  # convert to xy
+
+  return points
 
 class PredictBoxesPreprocessor(LogitsProcessor):
   """Force the model to predict a location tokens if the total probability mass on
@@ -276,6 +294,7 @@ class TaskRunner:
     prompt = prompt.replace("{}", expression)
     batch = self.uio2_preprocessor(text_inputs=prompt, image_inputs=image, target_modality="text")
     tokens = self.predict_text(batch, max_tokens=6, detokenize=False)
+    print(tokens)
     if len(tokens) != 6 or (tokens[0] != 0) or (tokens[-1] != 1):
       raise ValueError(f"Output not a bounding box {tokens}")
     box = token_to_float(np.array(tokens[1:-1]))
@@ -508,6 +527,7 @@ class TaskRunner:
     """
     # This prompt will get a COCO-like caption, which is generally expected
     prompt = self.prompt.random_prompt("image_caption_coco_2017")
+    print("prompt:", prompt)
     batch = self.uio2_preprocessor(text_inputs=prompt, image_inputs=image, target_modality="text")
     return self.predict_text(batch, max_tokens=64)
 

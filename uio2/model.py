@@ -349,6 +349,35 @@ class Decoder(nn.Module, GenerationMixin):
 class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
   """UnifiedIO Model"""
 
+  def set_dev1(self, dev):
+    self.dev1 = dev
+    if False:
+      self.decoder.to(self.dev1)
+    else:
+      self.encoder.to(self.dev1)
+
+      self.text_token_embedder.to(self.dev1)
+      self.image_token_embedder.to(self.dev1)
+      self.audio_token_embedder.to(self.dev1)
+
+      self.input_embedders.to(self.dev1)
+      self.target_embedders.to(self.dev1)
+
+  def set_dev2(self, dev):
+    self.dev2 = dev
+    if False:
+      self.encoder.to(self.dev2)
+
+      self.text_token_embedder.to(self.dev2)
+      self.image_token_embedder.to(self.dev2)
+      self.audio_token_embedder.to(self.dev2)
+
+      self.input_embedders.to(self.dev2)
+      self.target_embedders.to(self.dev2)
+    else:
+      self.decoder.to(self.dev2)
+      #self.encoder.to(self.dev2)
+
   def __init__(self, config, input_encoders=None, target_encoders=None):
     super().__init__()
     if isinstance(config, dict):  # Support create from dictionary for `PyTorchModelHubMixin`
@@ -660,11 +689,12 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
     else:
       return tokens
 
-  def encode_batch(self, input_features) -> seq_features.InputSequence:
+  def encode_batch(self, input_features, dev=None) -> seq_features.InputSequence:
     input_parts: List[InputSequence] = []
     for k, v in self.input_embedders.items():
       if k in input_features:
-        input_parts.append(v(**input_features[k], shared_embed=self.shared_embedding.get(k)))
+        feat = {kk: vv.to(dev) for kk,vv in input_features[k].items()}
+        input_parts.append(v(**feat, shared_embed=self.shared_embedding.get(k).to(dev)))
     input_seq = seq_features.concat_sequences(input_parts)
     return input_seq
 
@@ -682,14 +712,16 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
     cfg = self.config
     features = unflatten_dict(batch, sep="/")
 
-    input_seq = self.encode_batch(features["inputs"])
+    input_seq = self.encode_batch(features["inputs"],self.dev1)
+    #input_seq.to(self.dev2)
     encoder_hidden = self.encoder(input_seq)
+    #input_seq.to(self.dev1)
 
     target_parts = []
     target_features = features["targets"]
     for k, v in self.target_embedders.items():
       if target_features.get(k) is not None:
-        target_parts.append(v(**target_features[k], shared_embed=self.shared_embedding.get(k)))
+        target_parts.append(v(**{kk: vv.to(self.dev1) for kk,vv in target_features[k].items()}, shared_embed=self.shared_embedding.get(k).to(self.dev1)))
 
     target_tokens = [k.target_tokens for k in target_parts]
     loss_masks = [k.loss_mask for k in target_parts]
@@ -697,7 +729,8 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
       part.loss_mask = None
       part.target_tokens = None
 
-    target_seq = seq_features.concat_sequences(target_parts)
+    target_seq = seq_features.concat_sequences(target_parts).to(self.dev1)
+    
 
     encoder_decoder_mask = layers.make_attention_mask(
       target_seq.mask, input_seq.mask).to(target_seq.input_embedding.dtype)
@@ -711,17 +744,22 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
                        torch.unsqueeze(input_seq.segment_ids, -2)
       encoder_decoder_mask = encoder_decoder_mask * torch.unsqueeze(cross_seg_mask, 1)
 
+    encoder_hidden = encoder_hidden.to(self.dev2)
+    input_seq.to(self.dev2)
+
     # Do the decoding and output the feature vector for transformers.
     hidden_state = self.decoder(
-      encoded=encoder_hidden,
-      decoder_pos_emb=target_seq.position_embed,
-      decoder_embedding=target_seq.input_embedding,
-      decoder_attn_mask=decoder_attn_mask,
-      encoder_pos_emb=input_seq.position_embed,
-      encoder_decoder_mask=encoder_decoder_mask,
+      encoded=encoder_hidden.to(self.dev2),
+      decoder_pos_emb=target_seq.position_embed.to(self.dev2),
+      decoder_embedding=target_seq.input_embedding.to(self.dev2),
+      decoder_attn_mask=decoder_attn_mask.to(self.dev2),
+      encoder_pos_emb=input_seq.position_embed.to(self.dev2),
+      encoder_decoder_mask=encoder_decoder_mask.to(self.dev2),
       decoder_bias=None,
-      attn_pattern_mask=target_seq.attn_pattern_mask,
+      attn_pattern_mask=target_seq.attn_pattern_mask.to(self.dev2),
     )
+
+    hidden_state = hidden_state.to(self.dev1)
 
     # per-modality hidden states
     embedding_parts = torch.split(
@@ -730,10 +768,10 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
     logits = {}
     for name, state, targets, mask in zip(
         self.target_embedders, embedding_parts, target_tokens, loss_masks):
-      embed = self.shared_embedding[name]
+      embed = self.shared_embedding[name].to(self.dev1)
       modality_logits = F.linear(state, embed.weight)
       modality_logits = modality_logits / math.sqrt(state.shape[-1])
-      logits[name] = (modality_logits, targets, mask)
+      logits[name] = (modality_logits.to(self.dev1), targets.to(self.dev1), mask.to(self.dev1))
 
     return logits
 

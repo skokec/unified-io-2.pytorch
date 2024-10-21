@@ -85,6 +85,30 @@ class TargetSequence:
         continue
       all_subsegments = all_subsegments*(part.max()+1) + part
     return all_subsegments
+  def to(self, dev):
+    self.input_embedding = self.input_embedding.to(dev)
+    self.position_embed = self.position_embed.to(dev)
+    self.modality_id = self.modality_id.to(dev)
+
+    if self.mask is not None:
+      self.mask = self.mask.to(dev)
+
+    if self.attn_pattern_mask is not None:
+      self.attn_pattern_mask = self.attn_pattern_mask.to(dev)
+
+    if self.target_tokens is not None:
+      self.target_tokens = self.target_tokens.to(dev)
+
+    if self.subsegments is not None:
+      self.subsegments = self.subsegments.to(dev)
+
+    if self.segment_ids is not None:
+      self.segment_ids = self.segment_ids.to(dev)
+
+    if self.loss_mask is not None:
+      self.loss_mask = self.loss_mask.to(dev)
+
+    return self
 
 
 @dataclass
@@ -130,6 +154,18 @@ class InputSequence:
       assert self.mask.shape == (bs, seq_len)
     if self.segment_ids is not None:
       assert self.segment_ids.shape == (bs, seq_len)
+  
+  def to(self, dev):
+    if self.embed is not None:
+      self.embed = self.embed.to(dev)
+    if self.mask is not None:
+      self.mask = self.mask.to(dev)
+    if self.segment_ids is not None:
+      self.segment_ids = self.segment_ids.to(dev)
+    if self.position_embed is not None:
+      self.position_embed = self.position_embed.to(dev)
+    return self
+
 
 
 def expand_scalar(val, seq_len):

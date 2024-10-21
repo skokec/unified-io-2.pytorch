@@ -148,3 +148,4 @@ def undo_image_preprocessing(image, image_info, gray_scale=False,
     image = tf.image.convert_image_dtype(image, dtype=tf.uint8)
   return image.numpy()
 
+
