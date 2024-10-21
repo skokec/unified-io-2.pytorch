@@ -366,6 +366,7 @@ def values_to_tokens(vals, clss=None):
   num_bins = config.NUM_DETECTION_BIN
   vocab_start = config.VOCAB_START
   quantized_boxes = tf.cast(vals * (num_bins-1), tf.int32)
+  #quantized_boxes = tf.clip_by_value(quantized_boxes, 0, num_bins-1)
 
   # For values that were exactly one
   vals = tf.constant([f'<extra_id_{i}>' for i in range(vocab_start, vocab_start+num_bins)])

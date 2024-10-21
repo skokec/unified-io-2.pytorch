@@ -249,8 +249,10 @@ class Trainer:
         all_samples_metrics = {}
         tqdm_iterator = tqdm(train_dataset_it, desc="Training epoch #%d/%d" % (epoch,args['n_epochs']),dynamic_ncols=True) if self.world_rank == 0 else None
 
+
         from datasets.PreprocessorDataset import PreprocessorDataset
         train_preprocessor = PreprocessorDataset(preprocessor=preprocessor, dataset=None)
+
 
         for i, sample in enumerate(tqdm_iterator if tqdm_iterator is not None else train_dataset_it):
             
@@ -267,6 +269,7 @@ class Trainer:
                 batch = build_batch(preprocessed_examples, device=device)
             else:
                 batch = sample
+            # preprocessed_examples = []
             # for i in range(len(sample['im_name'])):
             #     im_size = [ii[i] for ii in sample['im_size']]
             #     img = sample['image'][i]
@@ -301,7 +304,7 @@ class Trainer:
 
             #     preprocessed_examples.append(preprocessed_example)
 
-            #batch = build_batch(sample, device=device)            
+            #batch = build_batch(sample, device=device)
             out = model(batch)
             
             total_loss = 0

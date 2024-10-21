@@ -146,10 +146,13 @@ def extract_individual_keypoints(text, image_info, ):
     if all(200 <= x < 1200 for x in ids):
       points.append(ids)
 
+  if len(points) <= 0:
+    return np.array([])
+
   points = extra_id_to_float(np.array(points))
   points *= config.IMAGE_INPUT_SIZE[0]
-
-  if image_info is not None:
+  
+  if image_info is not None :
     points = undo_box_preprocessing(np.tile(points, [1, 2]), image_info)[:, :2]
   points = points[:, ::-1]  # convert to xy
 

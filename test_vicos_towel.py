@@ -13,6 +13,8 @@ from PIL import Image
 from tqdm import tqdm
 import os
 
+from config import get_config_args
+
 import numpy as np
 
 def detect_keypoints(runner, img_filename, **kwargs):
@@ -37,17 +39,29 @@ def centers_to_tokens(gt_centers, img_shape):
 
     return gt_centers_text
 
+
 if __name__ == "__main__":
+
+    args = get_config_args()
+
+    PLOT = False
+
+    #EXP_FOLDER = "./exp/vicos-towels/model=allenai/uio2-large_resize_factor=1_batchsize=24/num_train_epoch=100/depth=False"
+    #EXP_FOLDER = "./exp/vicos-towels/model=allenai/uio2-large_resize_factor=1_batchsize=24_lr=0.001/num_train_epoch=100/depth=False"
+    EVAL_FOLDER = args['save_dir']
+    EVAL_TYPE = args['eval_type']
+    EVAL_EPOCH = args['eval_epoch']
+    #EVAL_TYPE = "train" # test or train
+    #EVAL_EPOCH = "_100"
+    
 
     dev = torch.device("cuda:0")
 
-    preprocessor = UnifiedIOPreprocessor.from_pretrained("allenai/uio2-preprocessor", tokenizer="/home/domen/Projects/vision-language/llama2/tokenizer.model")
-
-    #model = UnifiedIOModel.from_pretrained("allenai/uio2-xxl")
-    model = UnifiedIOModel.from_pretrained("allenai/uio2-large")
+    preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
+    model = UnifiedIOModel.from_pretrained(args['model']['name'])
     
-    #state = torch.load("./exp/vicos-towels/model=allenai/uio2-large_resize_factor=1_batchsize=24/num_train_epoch=100/depth=False/checkpoint.pth")
-    state = torch.load("./exp/vicos-towels/model=allenai/uio2-large_resize_factor=1_batchsize=24_lr=0.001/num_train_epoch=100/depth=False/checkpoint.pth")
+    state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
+
     model_state_dict = {k.replace("module.",""):v for k,v in state['model_state_dict'].items()}
     model.load_state_dict(model_state_dict, strict=True)
     model.to(dev)
@@ -145,8 +159,9 @@ if __name__ == "__main__":
         #subfolders = [dict(folder='../IJS-examples',data_subfolders=['.'])]
 
         #/storage/datasets/ClothDataset
-        db = ClothDataset(root_dir='/storage/local/ssd/cache/ClothDatasetVICOS/', resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
-                          transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train)
+        DB_ROOT= '/storage/local/ssd/cache/ClothDatasetVICOS/'
+        db = ClothDataset(root_dir=DB_ROOT, resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
+                          transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
         db = PreprocessorDataset(preprocessor, db, returned_raw_sample=True)
         # prepare training data
@@ -155,9 +170,14 @@ if __name__ == "__main__":
 
         plt.figure()
 
-        for i,preeprocessed_sample in enumerate(db):
-            if i % 8 != 0:
-                continue
+        from utils.evaluation.center_eval import CenterGlobalMinimizationEval
+        eval = CenterGlobalMinimizationEval("")
+
+        results = dict()
+
+        for i,preeprocessed_sample in enumerate(tqdm(db)):
+            #if i % 8 != 0:
+            #    continue
             sample = preeprocessed_sample['sample']
             img = np.array(sample['image'])
             center = sample['center']
@@ -189,33 +209,32 @@ if __name__ == "__main__":
                                                                 pad_token_id=1,
                                                             ))
 
-            print(sample['im_name'])
-            print("gt:", train_prompts[-1])
-            print(gt_centers)
-            print("prediction:", text)
-            print(kps)
+            results[sample['im_name'].replace(DB_ROOT,"")] = kps
 
-            import PIL
-            
-            plt.clf()
-            plt.subplot(1, 1, 1)            
-            plt.imshow(np.transpose(img,(1,2,0)))
-            plt.plot(gt_kps[:,0],gt_kps[:,1],'r.')
-            plt.plot(kps[:,1]+420,kps[:,0]-420,'bx')
-            
-            
-            plt.draw(); plt.pause(0.01)
+            if PLOT:
+                print(sample['im_name'])
+                print("gt:", train_prompts[-1])
+                print(gt_centers)
+                print("prediction:", text)
+                print(kps)
 
-            if False:
-                points = plt.ginput(2)
+                import PIL
                 
-                diff = np.array(points[0])-np.array(points[1])
+                plt.clf()
+                plt.subplot(1, 1, 1)            
+                plt.imshow(np.transpose(img,(1,2,0)))
+                plt.plot(gt_kps[:,0],gt_kps[:,1],'r.')
+                plt.plot(kps[:,0],kps[:,1],'bx')
+                #plt.plot(kps[:,1]+420,kps[:,0]-420,'bx')
                 
-                plt.plot(kps[:,1] + diff[1],kps[:,0] + diff[0],'bx')
-                
-                print("diff:", diff)
+                plt.draw(); plt.pause(0.01)
+                plt.waitforbuttonpress()	
+        
+        os.makedirs(os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}"), exist_ok=True)
 
-            plt.waitforbuttonpress()	
+        import pickle
+        with open(os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl"), 'wb') as f:
+            pickle.dump(results, f)
 
 
     if False:
