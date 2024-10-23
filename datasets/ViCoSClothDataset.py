@@ -131,17 +131,11 @@ class ClothDataset(Dataset):
 
 	def __getitem__(self, index):
 		im_fn = self.image_list[index]
-		# print("index", index)
-		#print("im_fn", im_fn)
 
 		root_dir = os.path.abspath(os.path.join(os.path.dirname(im_fn),'..'))
 		fn = os.path.splitext(os.path.split(im_fn)[-1])[0]
-		#ann_key = im_fn[im_fn.find('bg='):]
-		ann_key = os.path.abspath(im_fn)
 
-		#print("root_dir", root_dir)
-		#print("fn", fn)
-		#print("ann_key", ann_key)
+		ann_key = os.path.abspath(im_fn)
 
 		image = Image.open(im_fn)
 		im_size = image.size

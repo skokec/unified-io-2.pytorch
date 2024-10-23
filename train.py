@@ -250,12 +250,13 @@ class Trainer:
         tqdm_iterator = tqdm(train_dataset_it, desc="Training epoch #%d/%d" % (epoch,args['n_epochs']),dynamic_ncols=True) if self.world_rank == 0 else None
 
 
-        from datasets.PreprocessorDataset import PreprocessorDataset
-        train_preprocessor = PreprocessorDataset(preprocessor=preprocessor, dataset=None)
+        from datasets.PreprocessorDataset import KeypointPreprocessorDataset
+        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None)
 
 
         for i, sample in enumerate(tqdm_iterator if tqdm_iterator is not None else train_dataset_it):
             
+            # run train_preprocessor inside this loop to use GPU instead of running it as dataset
             if '/inputs/image/input' not in sample:
                 preprocessed_examples = []
                 for i in range(len(sample['im_name'])):
@@ -269,51 +270,13 @@ class Trainer:
                 batch = build_batch(preprocessed_examples, device=device)
             else:
                 batch = sample
-            # preprocessed_examples = []
-            # for i in range(len(sample['im_name'])):
-            #     im_size = [ii[i] for ii in sample['im_size']]
-            #     img = sample['image'][i]
-
-            #     # get gt points
-            #     center = sample['center'][i]
-                
-            #     def translate_gt(features, center):
-            #         gt_centers = center[(center[:, 0] > 0) | (center[:, 1] > 0), :]
-            #         # convert them to transformed input image space
-            #         top_pad, left_pad, scale, in_height, in_width,_,_,_,_,off_y,off_x = np.array(features['meta/image_info'])
-            #         # add scale                    
-            #         gt_centers /= scale
-            #         # add padding
-            #         gt_centers[:,0] += left_pad
-            #         gt_centers[:,1] += top_pad
-
-            #         from uio2 import config
-            #         gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)
-            #         features['text_targets'] = gt_centers_text
-
-            #         #print(sample['im_name'])
-            #         #print("gt:", gt_centers_text)
-            #         #print(gt_centers)
-
-            #         return features
-
-            #     from functools import partial
-            #     imput = "List coordinates of all visible towel corners in <image_input>"
-            #     preprocessed_example = preprocessor(text_inputs=imput, image_inputs=np.transpose(img,(1,2,0)), text_targets="", target_modality="text", 
-            #                                         raw_features_fn=partial(translate_gt, center=center))
-
-            #     preprocessed_examples.append(preprocessed_example)
-
-            #batch = build_batch(sample, device=device)
+            
             out = model(batch)
             
             total_loss = 0
             for modality, (logits, targets, mask) in out.items():
                 out_res = torch.argmax(torch.softmax(logits,dim=2),dim=2)
                 diff_tokens = out_res - targets
-                #print("gt", list(targets.cpu().numpy()))
-                #print("pr", list(out_res.cpu().numpy()))
-                #print("diff:", list(diff_tokens.cpu().numpy()))
                 losses = F.cross_entropy(logits.view(-1, logits.shape[-1]), targets.view(-1).to(torch.long), reduction="none")        
                 total_loss += (losses.reshape(logits.shape[:2])*mask)/mask.sum()
 
