@@ -11,6 +11,8 @@ from torch.utils.data import Dataset
 
 from uio2.data_utils import values_to_tokens
 
+from uio2.prompt import Prompt
+
 def centers_to_tokens(gt_centers, img_shape):
     
     gt_centers_tokens_x = values_to_tokens(gt_centers[:,0] / img_shape[1])
@@ -24,13 +26,17 @@ def centers_to_tokens(gt_centers, img_shape):
 
     return gt_centers_text
 
-class PreprocessorDataset(Dataset):
+class KeypointPreprocessorDataset(Dataset):
 
-    def __init__(self, preprocessor, dataset, returned_raw_sample=False):
+    def __init__(self, preprocessor, dataset, returned_raw_sample=False, randomize_keypoints_order=True):
         self.preprocessor = preprocessor
         self.dataset = dataset
 
         self.returned_raw_sample = returned_raw_sample
+
+        self.prompt = Prompt()
+
+        self.randomize_keypoints_order = randomize_keypoints_order
 
     def __len__(self):
         return len(self.dataset)
@@ -60,19 +66,22 @@ class PreprocessorDataset(Dataset):
             # swicth x,y 
             gt_centers = gt_centers[:,[1,0]]
 
+            if self.randomize_keypoints_order:
+                # Randomly shuffle the order of keypoints
+                indices = np.random.permutation(gt_centers.shape[0])
+                gt_centers = gt_centers[indices]
+
             from uio2 import config
             gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)
             features['text_targets'] = gt_centers_text
 
-            #print(sample['im_name'])
-            #print("gt:", gt_centers_text)
-            #print(gt_centers)
-
             return features
 
         from functools import partial
-        imput = "List coordinates of all visible towel corners in <image_input>"
-        preprocessed_example = self.preprocessor(text_inputs=imput, image_inputs=np.transpose(img,(1,2,0)), text_targets="", target_modality="text", 
+        
+        input = self.prompt.random_prompt('Towel_Corners')
+
+        preprocessed_example = self.preprocessor(text_inputs=input, image_inputs=np.transpose(img,(1,2,0)), text_targets="", target_modality="text", 
                                                  raw_features_fn=partial(translate_gt, center=center))
         
         if 'index' in sample:

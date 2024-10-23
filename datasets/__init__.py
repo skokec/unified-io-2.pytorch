@@ -1,5 +1,5 @@
 from .ViCoSClothDataset import ClothDataset
-from .PreprocessorDataset import PreprocessorDataset
+from .PreprocessorDataset import KeypointPreprocessorDataset
 
 def get_dataset(name, dataset_opts, preprocessor=None):
     if name.lower() == "vicos-towel":
@@ -8,6 +8,6 @@ def get_dataset(name, dataset_opts, preprocessor=None):
         raise RuntimeError("Dataset {} not available".format(name))
 
     if preprocessor is not None:
-        dataset = PreprocessorDataset(preprocessor, dataset)
+        dataset = KeypointPreprocessorDataset(preprocessor, dataset)
 
     return dataset

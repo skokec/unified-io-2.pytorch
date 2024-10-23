@@ -554,6 +554,21 @@ PROMPT_DICT['Audio_Generation'] = dict(
 )
 
 
+PROMPT_DICT['Towel_Corners'] = dict(
+  original=[
+    'List coordinates of all visible towel corners',
+  ],
+  manual=[
+    'What are coordinates of towel corners',
+    'Provide towel corners as list of x,y coordinates',
+    'Where are corners of a cloth? List them as x,y coordinates',
+    'I need to find out location of cloth corners in this image',
+    "Robot can grasp a cloth by its corners, where are they?"
+  ]
+)
+
+
+
 class Prompt:
   """Utility class to access prompts"""
 
