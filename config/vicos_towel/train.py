@@ -29,8 +29,10 @@ args = dict(
 	# --------
 	n_epochs=10,
 
+	extra_str='',
+
 	save_dir=os.path.join(OUTPUT_DIR, 'vicos-towels',
-						  'model={args[model][name]}_resize_factor={args[train_dataset][kwargs][resize_factor]}_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}',
+						  'model={args[model][name]}_resize_factor={args[train_dataset][kwargs][resize_factor]}_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}_with_prompt_and_gt_randomization{args[extra_str]}',
 						  'num_train_epoch={args[n_epochs]}', 
 						  'depth={args[train_dataset][kwargs][use_depth]}',
                           ),
