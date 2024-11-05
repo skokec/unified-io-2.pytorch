@@ -30,7 +30,7 @@ if [ "$SLURM_CLUSTER_NAME" == "frida" ]; then
     SLURM_CONTAINER_WORKDIR=$(dirname $BASH_SOURCE)
 
     # export arguments for TASK in slurm (this is used by ccc run and passed to srun)
-    export SLURM_TASK_ARGS="--output=logs/%j-node-%t.out --container-image=$SLURM_CONTAINER_IMG --container-mounts=$SLURM_CONTAINER_MOUNTS --container-workdir=$SLURM_CONTAINER_WORKDIR"
+    export SLURM_TASK_ARGS="--container-image=$SLURM_CONTAINER_IMG --container-mounts=$SLURM_CONTAINER_MOUNTS --container-workdir=$SLURM_CONTAINER_WORKDIR"
 
     # when running within container we need to setup conda env (use absence of 'srun' as indication that this is within container)
     if [ -z "$(which srun)" ]; then
@@ -61,6 +61,9 @@ else
     echo "Using conda env '$USE_CONDA_ENV'"
 
 fi
+
+# set default output logs to SLURM TASK
+export SLURM_TASK_ARGS="$SLURM_TASK_ARGS --output=logs/%j-node-%t.out"
 
 ###################################################
 ######## INPUT/OUTPUT PATH
