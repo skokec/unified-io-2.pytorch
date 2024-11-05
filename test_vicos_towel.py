@@ -160,8 +160,9 @@ if __name__ == "__main__":
         #subfolders = [dict(folder='../IJS-examples',data_subfolders=['.'])]
 
         #/storage/datasets/ClothDataset
-        DB_ROOT= '/storage/local/ssd/cache/ClothDatasetVICOS/'
-        db = ClothDataset(root_dir=DB_ROOT, resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
+        #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
+        CLOTH_DATASET_VICOS = os.environ.get('VICOS_TOWEL_DATASET')
+        db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
                           transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
         db = KeypointPreprocessorDataset(preprocessor, db, returned_raw_sample=True, randomize_keypoints_order=False)
