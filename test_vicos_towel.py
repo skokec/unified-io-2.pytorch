@@ -211,7 +211,7 @@ if __name__ == "__main__":
                                                                 pad_token_id=1,
                                                             ))
 
-            results[sample['im_name'].replace(DB_ROOT,"")] = kps
+            results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
 
             if PLOT:
                 print(sample['im_name'])
