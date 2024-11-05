@@ -18,7 +18,7 @@ from config import get_config_args
 import numpy as np
 
 def detect_keypoints(runner, img_filename, **kwargs):
-    p = "List coordinates of all visible towel corners in <image_input>"
+    p = "List coordinates of all visible towel corners"
     example = runner.uio2_preprocessor(text_inputs=p, image_inputs=img_filename, target_modality="text")
     text = runner.predict_text(example, max_tokens=32, detokenize=True, logits_processor=None, **kwargs)
     kps = extract_individual_keypoints(text, example["/meta/image_info"])
@@ -58,7 +58,8 @@ if __name__ == "__main__":
     dev = torch.device("cuda:0")
 
     preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
-    model = UnifiedIOModel.from_pretrained(args['model']['name'])
+    model = UnifiedIOModel.from_pretrained(args['model']['name'],local_files_only=True)
+
     
     state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
 
@@ -71,7 +72,7 @@ if __name__ == "__main__":
     runner = TaskRunner(model, preprocessor)
 
     if True:
-        from datasets import ClothDataset, PreprocessorDataset
+        from datasets import ClothDataset, KeypointPreprocessorDataset
 
         from torchvision.transforms import InterpolationMode
         transform_img_keys = ['image', 'instance', 'label', 'ignore', 'orientation', 'mask']
@@ -163,7 +164,7 @@ if __name__ == "__main__":
         db = ClothDataset(root_dir=DB_ROOT, resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
                           transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
-        db = PreprocessorDataset(preprocessor, db, returned_raw_sample=True)
+        db = KeypointPreprocessorDataset(preprocessor, db, returned_raw_sample=True, randomize_keypoints_order=False)
         # prepare training data
         train_imgs = []
         train_prompts = []
