@@ -7,6 +7,7 @@ dependencies:
   - _openmp_mutex=4.5=2_gnu
   - bzip2=1.0.8=h5eee18b_6
   - ca-certificates=2024.7.4=hbcca054_0
+  - gdb=11.2=py38he3c4487_2
   - git-lfs=3.5.1=ha770c72_0
   - ld_impl_linux-64=2.38=h1181459_1
   - libffi=3.4.4=h6a678d5_1
@@ -17,9 +18,11 @@ dependencies:
   - ncurses=6.4=h6a678d5_0
   - openssl=3.3.1=h4ab18f5_1
   - pip=24.0=py38h06a4308_0
+  - pygments=2.15.1=py38h06a4308_1
   - python=3.8.19=h955ad1f_0
   - readline=8.2=h5eee18b_0
   - setuptools=69.5.1=py38h06a4308_0
+  - six=1.16.0=pyhd3eb1b0_1
   - sqlite=3.45.3=h5eee18b_0
   - tk=8.6.14=h39e8969_0
   - wheel=0.43.0=py38h06a4308_0
@@ -98,6 +101,7 @@ dependencies:
     - pooch==1.8.2
     - protobuf==3.20.3
     - psutil==6.0.0
+    - ptvsd==4.3.2
     - pyarrow==16.1.0
     - pyarrow-hotfix==0.6
     - pyasn1==0.6.0
@@ -116,7 +120,6 @@ dependencies:
     - scikit-video==1.1.11
     - scipy==1.10.1
     - sentencepiece==0.2.0
-    - six==1.16.0
     - soundfile==0.12.1
     - soxr==0.3.7
     - sympy==1.12
