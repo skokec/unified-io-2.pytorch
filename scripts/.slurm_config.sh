@@ -1,15 +1,18 @@
 #!/bin/bash
 
-STORAGE_DIR_VEGA=/ceph/hpc/data/FRI/tabernikd/
+STORAGE_DIR_VEGA=/ceph/hpc/home/tabernikd/storage/
 STORAGE_DIR_ARNES=/d/hpc/projects/FRI/tabernikd/
 STORAGE_DIR_FRIDA=/shared/home/domen.tabernik/
 
 # set storage dir based on which HPC is active
 if [ -d "$STORAGE_DIR_VEGA" ]; then 
+    echo "Detected HPC-VEGA"
     STORAGE_DIR=$STORAGE_DIR_VEGA
 elif [ -d "$STORAGE_DIR_ARNES" ]; then 
+    echo "Detected HPC-ARNES"
     STORAGE_DIR=$STORAGE_DIR_ARNES
 elif [ -d "$STORAGE_DIR_FRIDA" ]; then
+    echo "Detected HPC-FRIDA"
     STORAGE_DIR=$STORAGE_DIR_FRIDA
 fi
 
