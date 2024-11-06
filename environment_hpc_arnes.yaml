@@ -34,7 +34,7 @@ dependencies:
       - attrs==23.2.0
       - audioread==3.0.1
       - cachetools==5.5.0
-      - git+https://github.com/vicoslab/ccc-tools
+      - ccc-tools==0.4.0
       - certifi==2022.12.7
       - cffi==1.17.0
       - charset-normalizer==2.1.1
@@ -77,6 +77,14 @@ dependencies:
       - networkx==3.0
       - numba==0.58.1
       - numpy==1.24.1
+      - nvidia-cuda-cupti-cu11==11.8.87
+      - nvidia-cuda-nvrtc-cu11==11.8.89
+      - nvidia-cuda-runtime-cu11==11.8.89
+      - nvidia-cufft-cu11==10.9.0.58
+      - nvidia-curand-cu11==10.3.0.86
+      - nvidia-cusparse-cu11==11.7.5.86
+      - nvidia-nccl-cu11==2.19.3
+      - nvidia-nvtx-cu11==11.8.86
       - oauthlib==3.2.2
       - opencv-python==4.10.0.84
       - opt-einsum==3.3.0
@@ -86,7 +94,7 @@ dependencies:
       - platformdirs==4.2.2
       - pooch==1.8.2
       - protobuf==3.20.3
-      - psutil==6.0.0
+      - psutil==6.1.0
       - pyarrow==16.1.0
       - pyarrow-hotfix==0.6
       - pyasn1==0.6.0
@@ -116,12 +124,12 @@ dependencies:
       - tensorflow-io-gcs-filesystem==0.34.0
       - termcolor==2.4.0
       - threadpoolctl==3.5.0
-      - tokenizers==0.19.1
+      - tokenizers==0.15.2
       - torch==2.1.0+cu121
       - torchaudio==2.1.0+cu121
       - torchvision==0.16.0+cu121
       - tqdm==4.66.5
-      - transformers==4.44.2
+      - transformers==4.36.0
       - triton==2.1.0
       - typing-extensions==4.5.0
       - tzdata==2024.1
@@ -131,4 +139,4 @@ dependencies:
       - xxhash==3.4.1
       - yarl==1.9.4
       - zipp==3.20.1
-prefix: /home/domen/conda/envs/unified-io-2
+prefix: /d/hpc/home/tabernikd/.conda/envs/unified-io-2
