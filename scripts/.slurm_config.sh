@@ -85,6 +85,8 @@ export STORAGE_DIR=${STORAGE_DIR:-/storage/}
 
 export LLAMA2_TOKENIZER=$(realpath ~/Projects/llama2_tokenizer.model)
 export VICOS_TOWEL_DATASET=$STORAGE_DIR/datasets/ViCoSTowelDataset
+export VICOS_MUJOCO_DATASET=$STORAGE_DIR/datasets/MuJoCo
+
 
 ###################################################
 ######## DATA PARALLEL SETTINGS

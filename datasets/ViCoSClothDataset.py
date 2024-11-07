@@ -222,8 +222,8 @@ class ClothDataset(Dataset):
 		sample['name'] = im_fn
 		sample['image'] = np.array(sample['image'])
 
-		if self.transform is not None:
-			transform = my_transforms.get_transform(self.transform) if type(self.transform) == list else self.transform
+		if self.transform is not None:		
+			transform = my_transforms.get_transform(self.transform) if self.transform is not None and type(self.transform) == list else transform	
 			import copy
 			do_transform = True
 
