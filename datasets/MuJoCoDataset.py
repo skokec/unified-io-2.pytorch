@@ -17,7 +17,7 @@ class MuJoCoDataset(Dataset):
 
 	def __init__(self, root_dir='./', subfolder="", MAX_NUM_CENTERS=1024, 
 			  	transform=None, transform_only_valid_centers=False, transform_per_sample_rng=False,  
-				use_depth=False, segment_cloth=False, use_normals=False, fixed_bbox_size=15, num_cpu_threads=1, normals_mode=1, reference_normal = [0,0,1], **kwargs):
+				use_depth=False, segment_cloth=False, use_normals=False, fixed_bbox_size=15, resize_factor=1, num_cpu_threads=1, normals_mode=1, reference_normal = [0,0,1], **kwargs):
 		print('MuJoCo Dataset created')
 
 		if num_cpu_threads:
@@ -28,6 +28,7 @@ class MuJoCoDataset(Dataset):
 		self.use_depth = use_depth
 		self.use_normals = use_normals
 		self.fixed_bbox_size = fixed_bbox_size
+		self.resize_factor = resize_factor
 		self.normals_mode = normals_mode
 		self.reference_normal = reference_normal
 		self.segment_cloth = segment_cloth
@@ -36,6 +37,7 @@ class MuJoCoDataset(Dataset):
 		self.rng = np.random.default_rng(1337)
 		self.transform_only_valid_centers = transform_only_valid_centers
 		self.transform_per_sample_rng = transform_per_sample_rng
+		self.return_image = True
 
 		print("dataset use_depth", use_depth)
 
@@ -63,7 +65,17 @@ class MuJoCoDataset(Dataset):
 		fn = os.path.splitext(os.path.split(im_fn)[-1])[0]	
 
 		image = Image.open(im_fn)
-		im_size = image.size
+		org_im_size = np.array(image.size)
+
+		if self.resize_factor is not None:
+			im_size = int(image.size[0] * self.resize_factor), int(image.size[1] * self.resize_factor)
+
+		# avoid loading full buffer data if image not requested
+		if self.return_image:
+			if self.resize_factor is not None and self.resize_factor != 1.0:
+				image = image.resize(im_size, Image.BILINEAR)
+		else:
+			image = None
 
 		root_dir = os.path.abspath(os.path.join(os.path.dirname(im_fn),'..'))
 		depth_fn = os.path.join(root_dir, 'depth', f'{fn}.npy')
@@ -79,9 +91,10 @@ class MuJoCoDataset(Dataset):
 			image=image,
 			im_name=im_fn,
 			im_size=im_size,
+			org_im_size=org_im_size,
 			index=index,
-		)
-		
+		)	
+
 		if self.segment_cloth:
 			gt_seg_fn = os.path.join(root_dir, "gt_cloth", f"{fn}.png")
 

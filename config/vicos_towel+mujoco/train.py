@@ -21,8 +21,6 @@ transforms = [{
 		'name': 'ToTensor',
 		'opts': {
 			'keys': ('image',),
-			#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()),
-			#'type': (torch.FloatTensor, torch.ShortTensor, torch.ByteTensor, torch.ByteTensor, torch.FloatTensor, torch.ByteTensor) + ((torch.FloatTensor, ) if USE_DEPTH else ()),
 			'type': (torch.FloatTensor,),
 		}
 	},
@@ -30,8 +28,6 @@ transforms = [{
 		'name': 'RandomHorizontalFlip',
 		'opts': {
 			'keys': ('image',),'keys_bbox': ('center',),
-			#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
-			#'keys_custom_fn' : { 'orientation': lambda x: (-1*x + np.pi)  % (2 * np.pi) - np.pi},
 			'p': 0.5,
 		}
 	},
@@ -39,8 +35,6 @@ transforms = [{
 		'name': 'RandomVerticalFlip',
 		'opts': {
 			'keys': ('image',),'keys_bbox': ('center',),
-			#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
-			#'keys_custom_fn' : { 'orientation': lambda x: (np.pi - x + np.pi)  % (2 * np.pi) - np.pi},
 			'p': 0.5,
 		}
 	},
@@ -49,12 +43,16 @@ transforms = [{
 		'opts': {
 			'keys': ('image',),'keys_bbox': ('center',),
 			'resample': (InterpolationMode.BILINEAR,),
-			#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
-			#'keys_custom_fn' : { 'orientation': lambda x,angle: (x + (angle*np.pi / 180.0) + np.pi)  % (2 * np.pi) - np.pi},
-			#'resample': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST,
-			#					InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST)  + ((InterpolationMode.BILINEAR, ) if USE_DEPTH else ()),
 			'angles': list(range(0,360,10)),
 			'rate':0.5,
+		}
+	},
+	{
+		'name': 'RandomCrop',
+		'opts': {
+			'keys': ('image',),'keys_bbox': ('center',),
+			'pad_if_needed': True,
+			'size': (512,512)
 		}
 	},
 	{

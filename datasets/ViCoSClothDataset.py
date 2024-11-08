@@ -219,7 +219,6 @@ class ClothDataset(Dataset):
 		sample['center'] = np.zeros((self.MAX_NUM_CENTERS, 2))
 		if len(centers) > 0:
 			sample['center'][:centers.shape[0], :] = centers
-		sample['name'] = im_fn
 		sample['image'] = np.array(sample['image'])
 
 		if self.transform is not None:		
