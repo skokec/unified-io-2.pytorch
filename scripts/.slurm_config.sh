@@ -28,18 +28,23 @@ if [ "$SLURM_CLUSTER_NAME" == "frida" ]; then
     # -- this config will be run once in main script on login node where conda and modules are not present, 
     # -- and once within container where conda is present
 
-    SLURM_CONTAINER_IMG="$STORAGE_DIR/containers/unified-io-2.sqfs"
+    #SLURM_CONTAINER_IMG="$STORAGE_DIR/containers/unified-io-2-new1.sqfs"
+    SLURM_CONTAINER_IMG="$STORAGE_DIR/containers/unified-io-2_cuda12.1.sqfs"
     SLURM_CONTAINER_MOUNTS="$STORAGE_DIR/:$STORAGE_DIR/,$STORAGE_DIR/Projects/llama2_tokenizer.model:/root/Projects/llama2_tokenizer.model:ro,$STORAGE_DIR/.cache/:/root/.cache/"
     SLURM_CONTAINER_WORKDIR=$(dirname $BASH_SOURCE)
 
     # export arguments for TASK in slurm (this is used by ccc run and passed to srun)
     export SLURM_TASK_ARGS="--container-image=$SLURM_CONTAINER_IMG --container-mounts=$SLURM_CONTAINER_MOUNTS --container-workdir=$SLURM_CONTAINER_WORKDIR"
 
+    # we need to set ENROOT_RESTRICT_DEV=n to force proper allocation of GPUs in a container that is running mutiple tasks on the same node
+    export ENROOT_RESTRICT_DEV=n
+
     # when running within container we need to setup conda env (use absence of 'srun' as indication that this is within container)
     if [ -z "$(which srun)" ]; then
         # manually call conda.sh to setup conda init
-        . "/root/miniconda3/etc/profile.d/conda.sh"
-
+        #. "/root/miniconda3/etc/profile.d/conda.sh" unified-io-2.sqfs version
+        . "/opt/conda/etc/profile.d/conda.sh" # for unified-io-2_cuda12.1.sqfs version
+        
         conda activate $USE_CONDA_ENV
         echo "Using conda env '$USE_CONDA_ENV'"
 
