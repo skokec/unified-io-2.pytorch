@@ -36,8 +36,8 @@ export PYTHONPATH=$PYTHONPATH:$SOURCE_DIR
 export STORAGE_DIR=${STORAGE_DIR:-/storage/}
 
 export LLAMA2_TOKENIZER="/home/domen/Projects/vision-language/llama2/tokenizer.model"
-#export VICOS_TOWEL_DATASET=$STORAGE_DIR/datasets/ClothDataset/ClothDatasetVICOS
-export VICOS_TOWEL_DATASET=/storage/local/ssd/cache/ClothDatasetVICOS
+export VICOS_TOWEL_DATASET=$STORAGE_DIR/datasets/ClothDataset/ClothDatasetVICOS
+#export VICOS_TOWEL_DATASET=/storage/local/ssd/cache/ClothDatasetVICOS
 export VICOS_MUJOCO_DATASET=$STORAGE_DIR/datasets/ClothDataset/MuJoCo
 
 ###################################################
