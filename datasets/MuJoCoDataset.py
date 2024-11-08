@@ -17,7 +17,8 @@ class MuJoCoDataset(Dataset):
 
 	def __init__(self, root_dir='./', subfolder="", MAX_NUM_CENTERS=1024, 
 			  	transform=None, transform_only_valid_centers=False, transform_per_sample_rng=False,  
-				use_depth=False, segment_cloth=False, use_normals=False, fixed_bbox_size=15, resize_factor=1, num_cpu_threads=1, normals_mode=1, reference_normal = [0,0,1], **kwargs):
+				use_depth=False, segment_cloth=False, use_normals=False, fixed_bbox_size=15, resize_factor=1, 
+				num_cpu_threads=1, normals_mode=1, reference_normal = [0,0,1], valid_img_names=None, **kwargs):
 		print('MuJoCo Dataset created')
 
 		if num_cpu_threads:
@@ -50,6 +51,13 @@ class MuJoCoDataset(Dataset):
 		image_list = []
 		for sub in subfolder:
 			image_list += sorted(glob.glob(f"{self.root_dir}/{sub}/rgb/*"))
+
+		if valid_img_names is not None:		
+			def filter_by_name(x):				
+				return any([v in x for v in valid_img_names])
+			
+			image_list = list(filter(filter_by_name, image_list))
+
 
 		self.image_list = image_list
 		print(f'MuJoCoDataset of size {len(image_list)}')

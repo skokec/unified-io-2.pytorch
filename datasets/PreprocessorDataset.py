@@ -55,6 +55,9 @@ class KeypointPreprocessorDataset(Dataset):
         # use this function to create keypoints based on actual image translation and convert them to text_target
         def translate_gt(features, center):
             gt_centers = center[(center[:, 0] > 0) | (center[:, 1] > 0), :]
+            if len(gt_centers) == 0:
+                features['text_targets'] = "No points found"
+                return features
             # convert them to transformed input image space
             top_pad, left_pad, scale, in_height, in_width,_,_,_,_,off_y,off_x = np.array(features['meta/image_info'])
             # add scale            
