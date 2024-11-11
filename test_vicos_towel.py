@@ -51,27 +51,31 @@ if __name__ == "__main__":
     EVAL_FOLDER = args['save_dir']
     EVAL_TYPE = args['eval_type']
     EVAL_EPOCH = args['eval_epoch']
+    SKIP_IF_EXISTS = args.get('skip_if_exists')
     #EVAL_TYPE = "train" # test or train
     #EVAL_EPOCH = "_100"
     
+    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl")
 
-    dev = torch.device("cuda:0")
+    if SKIP_IF_EXISTS and os.path.exists(OUTPUT_RESULT):
+        print(f"Skipping due to found existing results {OUTPUT_RESULT}")
+    else:
+        dev = torch.device("cuda:0")
 
-    preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
-    model = UnifiedIOModel.from_pretrained(args['model']['name'],local_files_only=True)
+        preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
+        model = UnifiedIOModel.from_pretrained(args['model']['name'],local_files_only=True)
 
-    
-    state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
+        
+        state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
 
-    model_state_dict = {k.replace("module.",""):v for k,v in state['model_state_dict'].items()}
-    model.load_state_dict(model_state_dict, strict=True)
-    model.to(dev)
+        model_state_dict = {k.replace("module.",""):v for k,v in state['model_state_dict'].items()}
+        model.load_state_dict(model_state_dict, strict=True)
+        model.to(dev)
 
-    model.eval()
+        model.eval()
 
-    runner = TaskRunner(model, preprocessor)
+        runner = TaskRunner(model, preprocessor)
 
-    if True:
         from datasets import ClothDataset, KeypointPreprocessorDataset
 
         from torchvision.transforms import InterpolationMode
@@ -232,10 +236,10 @@ if __name__ == "__main__":
                 plt.draw(); plt.pause(0.01)
                 plt.waitforbuttonpress()	
         
-        os.makedirs(os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}"), exist_ok=True)
+        os.makedirs(os.path.dirname(OUTPUT_RESULT), exist_ok=True)
 
         import pickle
-        with open(os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl"), 'wb') as f:
+        with open(OUTPUT_RESULT, 'wb') as f:
             pickle.dump(results, f)
 
 
