@@ -79,8 +79,8 @@ args = dict(
 
 	extra_str='',
 
-	save_dir=os.path.join(OUTPUT_DIR, 'vicos-towels',
-						  'model={args[model][name]}_resize_factor=%d_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}_with_prompt_and_gt_randomization{args[extra_str]}' % RESIZE_FACTOR,
+	save_dir=os.path.join(OUTPUT_DIR, 'vicos-towels+mujoco',
+						  'model={args[model][name]}_resize_factor=%f_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}_with_prompt_and_gt_randomization{args[extra_str]}' % RESIZE_FACTOR,
 						  'num_train_epoch={args[n_epochs]}', 
 						  f'depth={USE_DEPTH}',
                           ),
