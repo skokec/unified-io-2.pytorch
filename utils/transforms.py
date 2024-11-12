@@ -156,8 +156,8 @@ class RandomCrop(T.RandomCrop):
         if self.disabled:
             return sample
 
-        params = None
-
+        params = None        
+        pad_size = None
         for k in self.keys:
             assert(k in sample)
 
@@ -201,6 +201,10 @@ class RandomCrop(T.RandomCrop):
 
             sample[k][0, 2] -= dy
             sample[k][1, 2] -= dx
+
+        # save params for future reference
+        sample['RandomCrop'] = [params if params is not None else [0,0,-1,-1]],
+                                pad_size if pad_size is not None else [0,0,0,0]]
 
         return sample
 
