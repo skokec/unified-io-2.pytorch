@@ -106,6 +106,15 @@ if __name__ == "__main__":
                     'type': (torch.FloatTensor,),
                 },			
             },
+            
+            # {
+            #    'name': 'RandomCrop',
+            #    'opts': {
+            #        'keys': ('image',),'keys_bbox': ('center',),
+            #        'pad_if_needed': True,
+            #        'size': (512,512)
+            #    }
+            # },
             # {
 			# 		'name': 'RandomHorizontalFlip',
 			# 		'opts': {
@@ -163,10 +172,11 @@ if __name__ == "__main__":
         #subfolders = [dict(folder='../demo_cube', annotation='annotations.json', data_subfolders=['.']),]
         #subfolders = [dict(folder='../IJS-examples',data_subfolders=['.'])]
 
+        RESIZE_FACTOR=1
         #/storage/datasets/ClothDataset
         #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
         CLOTH_DATASET_VICOS = os.environ.get('VICOS_TOWEL_DATASET')
-        db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=1, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
+        db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=RESIZE_FACTOR, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
                           transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
         db = KeypointPreprocessorDataset(preprocessor, db, returned_raw_sample=True, randomize_keypoints_order=False)
@@ -214,7 +224,15 @@ if __name__ == "__main__":
                                                                 # warning from GenerationMixin so we just tell it 1 to keep it quiet
                                                                 pad_token_id=1,
                                                             ))
+            if 'RandomCrop' in sample:
+                params, pad_size = sample['RandomCrop']
+                # pad_size = (t,l,r,b) -- unclear if top and left are switched
+                # params = (dx,dy, th, tw)
 
+                kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
+                kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
+
+                
             results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
 
             if PLOT:
