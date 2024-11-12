@@ -28,7 +28,7 @@ def centers_to_tokens(gt_centers, img_shape):
 
 class KeypointPreprocessorDataset(Dataset):
 
-    def __init__(self, preprocessor, dataset, returned_raw_sample=False, randomize_keypoints_order=True):
+    def __init__(self, preprocessor, dataset, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False):
         self.preprocessor = preprocessor
         self.dataset = dataset
 
@@ -37,6 +37,7 @@ class KeypointPreprocessorDataset(Dataset):
         self.prompt = Prompt()
 
         self.randomize_keypoints_order = randomize_keypoints_order
+        self.jitter_keypoints_px = jitter_keypoints_px
 
     def __len__(self):
         return len(self.dataset)
@@ -74,6 +75,16 @@ class KeypointPreprocessorDataset(Dataset):
                 # Randomly shuffle the order of keypoints
                 indices = np.random.permutation(gt_centers.shape[0])
                 gt_centers = gt_centers[indices]
+
+            if self.jitter_keypoints_px:
+                # jitter each keypoint to prevent overfitting to the exact values
+
+                # Generate random jitter for each coordinate (N, 2)
+                jitter = np.random.uniform(-self.jitter_keypoints_px, self.jitter_keypoints_px, size=gt_centers.shape)
+
+                # Add the jitter to the original centers
+                gt_centers += jitter
+
 
             from uio2 import config
             gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)

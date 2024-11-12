@@ -116,6 +116,10 @@ args = dict(
 		'workers': 4,
         'force_workers_on_distributed_processing': True,
 		'shuffle': True,
+        'keypoint_preprocesser_kwargs': {
+              'randomize_keypoints_order': True,
+              'jitter_keypoints_px': False
+		}
 	}, 
 
 	model = dict(

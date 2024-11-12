@@ -249,9 +249,12 @@ class Trainer:
         all_samples_metrics = {}
         tqdm_iterator = tqdm(train_dataset_it, desc="Training epoch #%d/%d" % (epoch,args['n_epochs']),dynamic_ncols=True) if self.world_rank == 0 else None
 
+        train_preprocessor_args = args['train_dataset'].get('keypoint_preprocesser_kwargs')
+        if not train_preprocessor_args:
+            train_preprocessor_args = dict()
 
         from datasets.PreprocessorDataset import KeypointPreprocessorDataset
-        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None)
+        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None, **train_preprocessor_args)
 
 
         for i, sample in enumerate(tqdm_iterator if tqdm_iterator is not None else train_dataset_it):
