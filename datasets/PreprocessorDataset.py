@@ -85,6 +85,10 @@ class KeypointPreprocessorDataset(Dataset):
                 # Add the jitter to the original centers
                 gt_centers += jitter
 
+                # clip it within range
+                gt_centers[:,0] = np.clip(gt_centers[:,0],0, config.IMAGE_INPUT_SIZE[1]-1)
+                gt_centers[:,1] = np.clip(gt_centers[:,1],0, config.IMAGE_INPUT_SIZE[0]-1)
+
 
             from uio2 import config
             gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)

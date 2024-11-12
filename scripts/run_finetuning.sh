@@ -19,12 +19,13 @@ export DISABLE_X11=0
 
 
 export SLURM_JOB_ARGS="--output=logs/%j-node-%t.out --time=72:00:00 --mem-per-gpu=128G --partition=gpu --cpus-per-task=32 --constraint=h100"
-GPUS_FILE=$(ccc gpus --on_cluster=$CLUSTER_INFO_FILE --gpus=1 --tasks=1 --hosts="crushinator(1+2+3+4)" --gpus_as_single_host=True)
+GPUS_FILE=$(ccc gpus --on_cluster=$CLUSTER_INFO_FILE --gpus=1 --tasks=1 --hosts="flexo(1)" --gpus_as_single_host=True)
 
-#ccc run $GPUS_FILE python -m train ../config/vicos_towel/train.py --config  n_epochs=100 train_dataset.batch_size=16 train_dataset.workers=16 model.lr=1e-3 model.accumulate_grads_iter=8 train_dataset.kwargs.num_cpu_threads=4
-ccc run $GPUS_FILE python -m train ../config/vicos_towel/train.py --config train_dataset.batch_size=24 train_dataset.workers=16 model.lr=1e-3 n_epochs=300 save_interval=25 
+#ccc run $GPUS_FILE python -m train ../config/vicos_towel/train.py --config  n_epochs=100 train_dataset.batch_size=2 train_dataset.workers=16 model.lr=1e-3 model.accumulate_grads_iter=1 train_dataset.kwargs.num_cpu_threads=4
+#ccc run $GPUS_FILE python -m train ../config/vicos_towel/train.py --config train_dataset.batch_size=24 model.lr=1e-3 n_epochs=300 save_interval=25
+echo "flexo:0" > $GPUS_FILE
 
-#train_dataset.kwargs.transform_only_valid_centers=False
+ccc run $GPUS_FILE python -m train ../config/vicos_towel+mujoco/train.py --config  n_epochs=20 save_interval=2 train_dataset.batch_size=8 train_dataset.workers=16 model.lr=1e-3
 
 wait_or_interrupt
 rm $GPUS_FILE
