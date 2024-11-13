@@ -28,7 +28,7 @@ def centers_to_tokens(gt_centers, img_shape):
 
 class KeypointPreprocessorDataset(Dataset):
 
-    def __init__(self, preprocessor, dataset, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False):
+    def __init__(self, preprocessor, dataset, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False, apply_internal_scale_aug=False):
         self.preprocessor = preprocessor
         self.dataset = dataset
 
@@ -38,6 +38,7 @@ class KeypointPreprocessorDataset(Dataset):
 
         self.randomize_keypoints_order = randomize_keypoints_order
         self.jitter_keypoints_px = jitter_keypoints_px
+        self.apply_internal_scale_aug = apply_internal_scale_aug
 
     def __len__(self):
         return len(self.dataset)
@@ -101,7 +102,7 @@ class KeypointPreprocessorDataset(Dataset):
         input = self.prompt.random_prompt('Towel_Corners')
 
         preprocessed_example = self.preprocessor(text_inputs=input, image_inputs=np.transpose(img,(1,2,0)), text_targets="", target_modality="text", 
-                                                 raw_features_fn=partial(translate_gt, center=center))
+                                                 is_training=self.apply_internal_scale_aug, raw_features_fn=partial(translate_gt, center=center),)
         
         if 'index' in sample:
             preprocessed_example['index'] = sample['index']
