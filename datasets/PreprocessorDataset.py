@@ -62,16 +62,23 @@ class KeypointPreprocessorDataset(Dataset):
                 features['text_targets'] = "No points found"
                 return features
             # convert them to transformed input image space
-            top_pad, left_pad, scale, in_height, in_width,_,_,_,_,off_y,off_x = np.array(features['meta/image_info'])
+            top_pad, left_pad, scale, in_height, in_width,_,_,off_y,off_x,_,_ = np.array(features['meta/image_info'])
             # add scale            
             gt_centers /= scale
 
             # add padding
-            gt_centers[:,0] += left_pad
-            gt_centers[:,1] += top_pad
+            gt_centers[:,0] += left_pad - off_x
+            gt_centers[:,1] += top_pad - off_y
 
             # swicth x,y 
             gt_centers = gt_centers[:,[1,0]]
+
+            # remove keypoints that could fall outside of image (e.g., due to internal scale augmentation that also crops the image)
+            gt_centers = np.array([[x,y] for x,y in gt_centers if x >=0 and x<config.IMAGE_INPUT_SIZE[1]-1 and y >=0 and y<config.IMAGE_INPUT_SIZE[0]-1])
+
+            if len(gt_centers) == 0:
+                features['text_targets'] = "No points found"
+                return features
 
             if self.randomize_keypoints_order:
                 # Randomly shuffle the order of keypoints
