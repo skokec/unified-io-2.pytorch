@@ -56,6 +56,7 @@ class KeypointPreprocessorDataset(Dataset):
         
         # use this function to create keypoints based on actual image translation and convert them to text_target
         def translate_gt(features, center):
+            from uio2 import config            
             gt_centers = center[(center[:, 0] > 0) | (center[:, 1] > 0), :]
             if len(gt_centers) == 0:
                 features['text_targets'] = "No points found"
@@ -91,7 +92,6 @@ class KeypointPreprocessorDataset(Dataset):
                 gt_centers[:,1] = np.clip(gt_centers[:,1],0, config.IMAGE_INPUT_SIZE[0]-1)
 
 
-            from uio2 import config
             gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)
             features['text_targets'] = gt_centers_text
 
