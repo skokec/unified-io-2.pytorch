@@ -51,11 +51,15 @@ if __name__ == "__main__":
     EVAL_FOLDER = args['save_dir']
     EVAL_TYPE = args['eval_type']
     EVAL_EPOCH = args['eval_epoch']
+    EVAL_CROPPED = args['eval_cropped']
     SKIP_IF_EXISTS = args.get('skip_if_exists')
     #EVAL_TYPE = "train" # test or train
     #EVAL_EPOCH = "_100"
     
     OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl")
+
+    if EVAL_CROPPED:
+        OUTPUT_RESULT = OUTPUT_RESULT.replace("results.pkl","results_cropped_img.pkl")
 
     if SKIP_IF_EXISTS and os.path.exists(OUTPUT_RESULT):
         print(f"Skipping due to found existing results {OUTPUT_RESULT}")
@@ -107,14 +111,6 @@ if __name__ == "__main__":
                 },			
             },
             
-            # {
-            #    'name': 'RandomCrop',
-            #    'opts': {
-            #        'keys': ('image',),'keys_bbox': ('center',),
-            #        'pad_if_needed': True,
-            #        'size': (512,512)
-            #    }
-            # },
             # {
 			# 		'name': 'RandomHorizontalFlip',
 			# 		'opts': {
@@ -172,7 +168,20 @@ if __name__ == "__main__":
         #subfolders = [dict(folder='../demo_cube', annotation='annotations.json', data_subfolders=['.']),]
         #subfolders = [dict(folder='../IJS-examples',data_subfolders=['.'])]
 
-        RESIZE_FACTOR=1
+        if EVAL_CROPPED:
+            RESIZE_FACTOR=0.5
+            transform.append(
+                {
+                'name': 'RandomCrop',
+                'opts': {
+                    'keys': ('image',),'keys_bbox': ('center',),
+                    'pad_if_needed': True,
+                    'size': (512,512)
+                }
+                })
+        else:
+            RESIZE_FACTOR=1.0
+        
         #/storage/datasets/ClothDataset
         #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
         CLOTH_DATASET_VICOS = os.environ.get('VICOS_TOWEL_DATASET')
@@ -211,7 +220,6 @@ if __name__ == "__main__":
 
             train_prompts.append(f"List coordinates of all visible towel corners in <image_input>: {gt_centers_text}")
             train_imgs.append(img)
-
 
             kps, text = detect_keypoints(runner, np.transpose(img,(1,2,0)),
                                          generation_config = GenerationConfig(
