@@ -51,7 +51,7 @@ if __name__ == "__main__":
     EVAL_FOLDER = args['save_dir']
     EVAL_TYPE = args['eval_type']
     EVAL_EPOCH = args['eval_epoch']
-    EVAL_CROPPED = args['eval_cropped']
+    EVAL_CROPPED = args.get('eval_cropped')
     SKIP_IF_EXISTS = args.get('skip_if_exists')
     #EVAL_TYPE = "train" # test or train
     #EVAL_EPOCH = "_100"
