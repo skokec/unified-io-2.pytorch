@@ -18,7 +18,7 @@ class ClothDataset(Dataset):
 	IGNORE_OVERLAP_BORDER_FLAG = 4
 	IGNORE_DIFFICULT_FLAG = 8
     
-	def __init__(self, root_dir='./', subfolders=None, fixed_bbox_size=15, resize_factor=None, use_depth=False, segment_cloth=False, MAX_NUM_CENTERS=1024, 
+	def __init__(self, root_dir='./', subfolders=None, fixed_bbox_size=15, resize_factor=None, use_depth=False, segment_cloth=False, segment_edges=False, edge_thickness=10, MAX_NUM_CENTERS=1024, 
 			  	valid_img_names=None, num_cpu_threads=1, use_mean_for_depth_nan=False, 
 				use_normals=False, normals_mode=1, use_only_depth=False, correct_depth_rotation=False,
 				check_consistency=True, transform=None, transform_only_valid_centers=False, transform_per_sample_rng=False, **kwargs):
@@ -33,6 +33,8 @@ class ClothDataset(Dataset):
 		self.normals_mode = normals_mode
 		self.use_only_depth = use_only_depth
 		self.segment_cloth = segment_cloth
+		self.edge_thickness = edge_thickness
+		self.segment_edges = segment_edges
 
 		self.correct_depth_rotation = correct_depth_rotation
 
@@ -165,6 +167,33 @@ class ClothDataset(Dataset):
 				segmentation_mask = segmentation_mask.resize(im_size, Image.BILINEAR)
 
 			sample["segmentation_mask"] = segmentation_mask
+		
+		if self.segment_edges:
+			polylines = self.annotations_edges.get(ann_key, [])
+			inner_edge_polylines = [np.array(line["points"]).astype(int) for line in polylines if line["label"] == "inner edge"]
+			outer_edge_polylines = [np.array(line["points"]).astype(int) for line in polylines if line["label"] == "outer edge"]
+
+			outer_edge_mask = np.zeros((org_im_size[1], org_im_size[0]), dtype=np.uint8)
+			inner_edge_mask = np.zeros((org_im_size[1], org_im_size[0]), dtype=np.uint8)
+			
+			outer_edge_mask = cv2.polylines(outer_edge_mask, outer_edge_polylines, isClosed=False, color=255, thickness=self.edge_thickness)
+			inner_edge_mask = cv2.polylines(inner_edge_mask, inner_edge_polylines, isClosed=False, color=255, thickness=self.edge_thickness)
+
+			if self.segment_edges == "combined":
+				edge_mask = np.maximum(outer_edge_mask, inner_edge_mask)
+
+				if self.resize_factor is not None and self.resize_factor != 1.0:
+					edge_mask = cv2.resize(edge_mask, im_size)
+
+				sample["edge_mask"] = edge_mask
+
+			elif self.segment_edges == "individual":
+				if self.resize_factor is not None and self.resize_factor != 1.0:
+					outer_edge_mask = cv2.resize(outer_edge_mask, im_size)
+					inner_edge_mask = cv2.resize(inner_edge_mask, im_size)
+
+				sample["outer_edge_mask"] = outer_edge_mask
+				sample["inner_edge_mask"] = inner_edge_mask
 
 		if self.use_depth and False:
 			from utils.utils_depth import get_normals, eul2rot, rotate_depth
