@@ -1,0 +1,6 @@
+*.pyc
+*.pth
+*.pkl
+exp/*
+scripts/exp/*
+scripts/logs/*
