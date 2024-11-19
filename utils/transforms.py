@@ -51,7 +51,7 @@ class CropRandomObject:
             j = rng.integers(max(1,w - self.size[0]))
 
         for k in self.keys:
-            assert(k in sample)
+            if k not in sample: continue
 
             if type(sample[k]) == torch.Tensor and len(sample[k].shape) == 2:
                 sample[k] = F.crop(sample[k].unsqueeze(0), i, j, self.size[1], self.size[0])[0]
@@ -59,7 +59,8 @@ class CropRandomObject:
                 sample[k] = F.crop(sample[k], i, j, self.size[1], self.size[0])
 
         for k in self.keys_bbox:
-            assert (k in sample)
+            if k not in sample: continue
+
             assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
 
             i,j = 0,1
@@ -159,7 +160,7 @@ class RandomCrop(T.RandomCrop):
         params = None        
         pad_size = None
         for k in self.keys:
-            assert(k in sample)
+            if k not in sample: continue
 
             if self.pad_if_needed:
                 sample[k], pad_size = self._pad_if_needed(sample[k])
@@ -173,7 +174,7 @@ class RandomCrop(T.RandomCrop):
                 sample[k] = F.crop(sample[k], *params)
 
         for k in self.keys_bbox:
-            assert (k in sample)
+            if k not in sample: continue
             assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
             assert params
 
@@ -193,7 +194,7 @@ class RandomCrop(T.RandomCrop):
             sample[k][idx, j] -= dx
         
         for k in self.keys_camK:
-            assert (k in sample)
+            if k not in sample: continue
             assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
             assert params
 
@@ -287,7 +288,7 @@ class RandomCustomRotation(object):
 
             for idx, k in enumerate(self.keys):
 
-                assert(k in sample)
+                if k not in sample: continue
 
                 resample = self.resample
                 if isinstance(resample, collections.Iterable):
@@ -310,7 +311,7 @@ class RandomCustomRotation(object):
                 new_center = (new_im_size[0]/2,new_im_size[1]/2) if self.expand else old_center
 
                 for k in self.keys_bbox:
-                    assert (k in sample)
+                    if k not in sample: continue
                     assert isinstance(sample[k],torch.Tensor) or isinstance(sample[k],np.ndarray)
 
                     i, j = 0, 1
@@ -387,7 +388,7 @@ class RandomRotation(T.RandomRotation):
 
         for idx, k in enumerate(self.keys):
 
-            assert(k in sample)
+            if k not in sample: continue
 
             resample = self.resample
             if isinstance(resample, collections.Iterable):
@@ -415,7 +416,7 @@ class RandomHorizontalFlip(T.RandomHorizontalFlip):
 
         if rng.random() < self.p:
             for k in self.keys:
-                assert (k in sample)
+                if k not in sample: continue
                 if type(sample[k]) == torch.Tensor and len(sample[k].shape) == 2:
                     sample[k] = F.hflip(sample[k].unsqueeze(0))[0]
                 else:
@@ -426,7 +427,7 @@ class RandomHorizontalFlip(T.RandomHorizontalFlip):
                     im_size = get_image_size(sample[self.keys[0]])
                 assert im_size
                 for k in self.keys_bbox:
-                    assert (k in sample)
+                    if k not in sample: continue
                     assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
 
                     i, j = 0, 1
@@ -460,7 +461,7 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
 
         if rng.random() < self.p:
             for k in self.keys:
-                assert (k in sample)
+                if k not in sample: continue
                 if type(sample[k]) == torch.Tensor and len(sample[k].shape) == 2:
                     sample[k] = F.vflip(sample[k].unsqueeze(0))[0]
                 else:
@@ -471,7 +472,7 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
                     im_size = get_image_size(sample[self.keys[0]])
                 assert im_size
                 for k in self.keys_bbox:
-                    assert (k in sample)
+                    if k not in sample: continue
                     assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
 
                     i, j = 0, 1
@@ -525,7 +526,7 @@ class RandomResize(object):
 
         for idx, k in enumerate(self.keys):
 
-            assert(k in sample)
+            if k not in sample: continue
 
             interpolation = self.interpolation
             if isinstance(interpolation, collections.Iterable):
@@ -545,7 +546,7 @@ class RandomResize(object):
             real_resize_factor = new_im_size[0] / org_im_size[0], new_im_size[1] / org_im_size[1]
 
             for k in self.keys_bbox:
-                assert (k in sample)
+                if k not in sample: continue
                 assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
 
                 i, j = 0, 1
@@ -600,7 +601,7 @@ class Resize(T.Resize):
 
         for idx, k in enumerate(self.keys):
 
-            assert(k in sample)
+            if k not in sample: continue
 
             interpolation = self.interpolation
             if isinstance(interpolation, collections.Iterable):
@@ -616,7 +617,7 @@ class Resize(T.Resize):
             resize_factor = self.size[1]/org_im_size[0], self.size[0]/org_im_size[1]
 
             for k in self.keys_bbox:
-                assert (k in sample)
+                if k not in sample: continue
                 assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
 
                 i, j = 0, 1
@@ -677,7 +678,7 @@ class ColorJitter(T.ColorJitter):
         if rng.random() < self.p:
             for idx, k in enumerate(self.keys):
 
-                assert(k in sample)
+                if k not in sample: continue
 
                 fn_idx, brightness_factor, contrast_factor, saturation_factor, hue_factor = \
                     self.get_params(self.brightness, self.contrast, self.saturation, self.hue, rng)
@@ -716,7 +717,7 @@ class RandomGaussianNoise(object):
         if rng.random() < self.p:
             noise = None
             for idx, k in enumerate(self.keys):
-                assert(k in sample)
+                if k not in sample: continue
                 
                 if noise is  None:
                     mean = rng.uniform(self.mean[0], self.mean[1]) if type(self.mean) in [list,tuple] else self.mean
@@ -777,7 +778,7 @@ class Padding(object):
         pad_size = None
 
         for k in self.keys:
-            assert(k in sample)
+            if k not in sample: continue
 
             pad_size_ = self.get_pad_size(sample[k])
 
@@ -814,7 +815,7 @@ class Padding(object):
                 sample[k] = ignore
 
         for k in self.keys_bbox:
-            assert (k in sample)
+            if k not in sample: continue
             assert isinstance(sample[k], torch.Tensor) or isinstance(sample[k], np.ndarray)
             assert pad_size
 
@@ -844,7 +845,7 @@ class ToTensor(object):
 
         for idx, k in enumerate(self.keys):
 
-            assert(k in sample)
+            if k not in sample: continue
 
             t = self.type
             if isinstance(t, collections.Iterable):
@@ -894,7 +895,7 @@ class RandomGaussianBlur(object):
 
         if sigma > 0:
             for idx, k in enumerate(self.keys):
-                assert (k in sample)
+                if k not in sample: continue
                 #sample[k] = gaussian_filter(sample[k], sigma)
                 sample[k] = F.gaussian_blur(sample[k], 2*round(3*sigma) + 1, sigma)
 
@@ -931,7 +932,7 @@ class Normalize(object):
 
         for idx, k in enumerate(self.keys):
 
-            assert(k in sample)
+            if k not in sample: continue
 
             m = self.mean
             if isinstance(m, collections.Iterable):
