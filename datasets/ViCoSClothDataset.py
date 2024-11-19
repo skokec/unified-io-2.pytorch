@@ -102,6 +102,14 @@ class ClothDataset(Dataset):
 			for k,v in annot.items():
 				annotations[os.path.abspath(os.path.join(sub,k))] = v
 
+		self.annotations_edges = {}
+		if segment_edges:
+			with open(os.path.join(root_dir,'annotations_edges.json')) as f:
+				annots = json.load(f)
+
+				for k,v in annots.items():
+					self.annotations_edges[os.path.abspath(os.path.join(root_dir,k))] = v
+
 		# for k, v in annotations.items():
 		# 	print(k,len(v['points']))
 		def is_clutter_and_light3(x):
@@ -170,11 +178,19 @@ class ClothDataset(Dataset):
 		
 		if self.segment_edges:
 			polylines = self.annotations_edges.get(ann_key, [])
-			inner_edge_polylines = [np.array(line["points"]).astype(int) for line in polylines if line["label"] == "inner edge"]
-			outer_edge_polylines = [np.array(line["points"]).astype(int) for line in polylines if line["label"] == "outer edge"]
 
-			outer_edge_mask = np.zeros((org_im_size[1], org_im_size[0]), dtype=np.uint8)
-			inner_edge_mask = np.zeros((org_im_size[1], org_im_size[0]), dtype=np.uint8)
+			inner_edge_polylines = [np.array(line["points"]) for line in polylines if line["label"] == "inner edge"]
+			outer_edge_polylines = [np.array(line["points"]) for line in polylines if line["label"] == "outer edge"]
+
+			if self.resize_factor is not None and self.resize_factor != 1.0:
+				inner_edge_polylines = [np.array(p*self.resize_factor) for p in inner_edge_polylines]
+				outer_edge_polylines = [np.array(p*self.resize_factor) for p in outer_edge_polylines]
+
+			inner_edge_polylines = [np.round(p).astype(int) for p in inner_edge_polylines]
+			outer_edge_polylines = [np.round(p).astype(int) for p in outer_edge_polylines]
+
+			outer_edge_mask = np.zeros((im_size[1], im_size[0]), dtype=np.uint8)
+			inner_edge_mask = np.zeros((im_size[1], im_size[0]), dtype=np.uint8)
 			
 			outer_edge_mask = cv2.polylines(outer_edge_mask, outer_edge_polylines, isClosed=False, color=255, thickness=self.edge_thickness)
 			inner_edge_mask = cv2.polylines(inner_edge_mask, inner_edge_polylines, isClosed=False, color=255, thickness=self.edge_thickness)
@@ -182,15 +198,9 @@ class ClothDataset(Dataset):
 			if self.segment_edges == "combined":
 				edge_mask = np.maximum(outer_edge_mask, inner_edge_mask)
 
-				if self.resize_factor is not None and self.resize_factor != 1.0:
-					edge_mask = cv2.resize(edge_mask, im_size)
-
 				sample["edge_mask"] = edge_mask
 
 			elif self.segment_edges == "individual":
-				if self.resize_factor is not None and self.resize_factor != 1.0:
-					outer_edge_mask = cv2.resize(outer_edge_mask, im_size)
-					inner_edge_mask = cv2.resize(inner_edge_mask, im_size)
 
 				sample["outer_edge_mask"] = outer_edge_mask
 				sample["inner_edge_mask"] = inner_edge_mask
