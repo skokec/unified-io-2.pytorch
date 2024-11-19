@@ -57,29 +57,29 @@ args = dict(
 				{
 					'name': 'ToTensor',
 					'opts': {
-						'keys': ('image',),
-						'type': (torch.FloatTensor,),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),
+                        'type': (torch.FloatTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor),
 					}
 				},
 				{
 					'name': 'RandomHorizontalFlip',
 					'opts': {
-						'keys': ('image',),'keys_bbox': ('center',),
+                        'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 						'p': 0.5,
 					}
 				},
 				{
 					'name': 'RandomVerticalFlip',
 					'opts': {
-						'keys': ('image',),'keys_bbox': ('center',),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 						'p': 0.5,
 					}
 				},
 				{
 					'name': 'RandomCustomRotation',
 					'opts': {
-						'keys': ('image',),'keys_bbox': ('center',),
-						'resample': (InterpolationMode.BILINEAR,),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
+						'resample': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST),
 						'angles': list(range(0,360,10)),
 						'rate':0.5,
 					}

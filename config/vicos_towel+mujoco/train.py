@@ -20,29 +20,29 @@ def rotate_orientation_values(orientation, angle):
 transforms = [{
 		'name': 'ToTensor',
 		'opts': {
-			'keys': ('image',),
-			'type': (torch.FloatTensor,),
+			'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),
+			'type': (torch.FloatTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor),
 		}
 	},
 	{
 		'name': 'RandomHorizontalFlip',
 		'opts': {
-			'keys': ('image',),'keys_bbox': ('center',),
+			'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 			'p': 0.5,
 		}
 	},
 	{
 		'name': 'RandomVerticalFlip',
 		'opts': {
-			'keys': ('image',),'keys_bbox': ('center',),
+			'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 			'p': 0.5,
 		}
 	},
 	{
 		'name': 'RandomCustomRotation',
 		'opts': {
-			'keys': ('image',),'keys_bbox': ('center',),
-			'resample': (InterpolationMode.BILINEAR,),
+			'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
+			'resample': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST),
 			'angles': list(range(0,360,10)),
 			'rate':0.5,
 		}
@@ -50,7 +50,7 @@ transforms = [{
 	{
 		'name': 'RandomCrop',
 		'opts': {
-			'keys': ('image',),'keys_bbox': ('center',),
+			'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 			'pad_if_needed': True,
 			'size': (512,512)
 		}
@@ -154,7 +154,17 @@ args = dict(
         lambda_scheduler_fn=lambda _args: (lambda epoch: 1.0), # disabled
 		lr=1e-4,
 		weight_decay=0,
-
+		finetune_adapter=dict(
+			enable=True,
+            name='LoRA',
+            kwargs=dict(
+				target_modules=["query", "value","out_proj","key"],
+				r=8,                  # Low-rank adaptation rank (8)
+				lora_alpha=16,        # Scaling factor for LoRA (16)
+				lora_dropout=0.1,     # Dropout for LoRA parameters
+                task_type="CAUSAL_LM"
+			)
+		)
 	),
 )
 

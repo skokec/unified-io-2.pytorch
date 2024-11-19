@@ -69,16 +69,16 @@ args = dict(
 				{
 					'name': 'ToTensor',
 					'opts': {
-						'keys': ('image',),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),
 						#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()),
 						#'type': (torch.FloatTensor, torch.ShortTensor, torch.ByteTensor, torch.ByteTensor, torch.FloatTensor, torch.ByteTensor) + ((torch.FloatTensor, ) if USE_DEPTH else ()),
-                        'type': (torch.FloatTensor,),
+                        'type': (torch.FloatTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor),
 					}
 				},
 				{
 					'name': 'RandomHorizontalFlip',
 					'opts': {
-                        'keys': ('image',),'keys_bbox': ('center',),
+                        'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 						#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
 						#'keys_custom_fn' : { 'orientation': lambda x: (-1*x + np.pi)  % (2 * np.pi) - np.pi},
 						'p': 0.5,
@@ -87,7 +87,7 @@ args = dict(
 				{
 					'name': 'RandomVerticalFlip',
 					'opts': {
-						'keys': ('image',),'keys_bbox': ('center',),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
 						#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
 						#'keys_custom_fn' : { 'orientation': lambda x: (np.pi - x + np.pi)  % (2 * np.pi) - np.pi},
 						'p': 0.5,
@@ -96,8 +96,8 @@ args = dict(
 				{
 					'name': 'RandomCustomRotation',
 					'opts': {
-						'keys': ('image',),'keys_bbox': ('center',),
-						'resample': (InterpolationMode.BILINEAR,),
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),'keys_bbox': ('center',),
+						'resample': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST),
 						#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()), 'keys_bbox': ('center',),
 						#'keys_custom_fn' : { 'orientation': lambda x,angle: (x + (angle*np.pi / 180.0) + np.pi)  % (2 * np.pi) - np.pi},
 						#'resample': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST,
