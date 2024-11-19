@@ -55,7 +55,9 @@ if __name__ == "__main__":
     SKIP_IF_EXISTS = args.get('skip_if_exists')
     #EVAL_TYPE = "train" # test or train
     #EVAL_EPOCH = "_100"
-    
+
+    DISPLAY_TO_FILE = args.get("display_to_file")
+
     OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl")
 
     if EVAL_CROPPED:
@@ -232,17 +234,6 @@ if __name__ == "__main__":
                                                                 # warning from GenerationMixin so we just tell it 1 to keep it quiet
                                                                 pad_token_id=1,
                                                             ))
-            if 'RandomCrop' in sample:
-                params, pad_size = sample['RandomCrop']
-                # pad_size = (t,l,r,b) -- unclear if top and left are switched
-                # params = (dx,dy, th, tw)
-
-                kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
-                kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
-
-                
-            results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
-
             if PLOT:
                 print(sample['im_name'])
                 print("gt:", train_prompts[-1])
@@ -261,6 +252,40 @@ if __name__ == "__main__":
                 
                 plt.draw(); plt.pause(0.01)
                 plt.waitforbuttonpress()	
+            
+            if DISPLAY_TO_FILE:
+                import cv2
+                img_denormalized = (img * 255).astype(np.uint8)
+                img_transposed = np.transpose(img_denormalized, (1, 2, 0))
+                # Convert the image to BGR (OpenCV uses BGR, while matplotlib uses RGB)
+                img_bgr = cv2.cvtColor(img_transposed, cv2.COLOR_RGB2BGR)
+
+                # Clone the image for drawing keypoints
+                img_copy = img_bgr.copy()
+
+                # Draw ground truth keypoints (red dots)
+                for pt in gt_kps:
+                    cv2.circle(img_copy, (int(pt[0]), int(pt[1])), radius=5, color=(0, 0, 255), thickness=-1)
+
+                # Draw predicted keypoints (blue x's)
+                for pt in kps:
+                    cv2.drawMarker(img_copy, (int(pt[0]), int(pt[1])), color=(255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=10, thickness=2)
+
+                os.makedirs(os.path.join(os.path.dirname(OUTPUT_RESULT),"plot_cropped" if EVAL_CROPPED else "plot"), exist_ok=True)
+                cv2.imwrite(os.path.join(os.path.dirname(OUTPUT_RESULT),"plot_cropped" if EVAL_CROPPED else "plot", sample['im_name'].replace(CLOTH_DATASET_VICOS,"").replace("/",".")), img_copy)
+
+            if 'RandomCrop' in sample:
+                params, pad_size = sample['RandomCrop']
+                # pad_size = (t,l,r,b) -- unclear if top and left are switched
+                # params = (dx,dy, th, tw)
+                kps = kps.reshape(-1,2)
+                
+                kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
+                kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
+
+                
+            results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
+
         
         os.makedirs(os.path.dirname(OUTPUT_RESULT), exist_ok=True)
 
