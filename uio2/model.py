@@ -12,7 +12,7 @@ from transformers import GenerationMixin, DynamicCache, GenerationConfig
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.utils import ModelOutput, CONFIG_NAME
 
-from uio2.config import Config, T5Config
+from uio2.config import Config, T5Config, deep_merge
 from uio2 import seq_features, layers
 from uio2.get_modality_processor import get_input_modalities, get_target_modalities
 from uio2.runner import ClfFreeGuidanceProcessor
@@ -378,8 +378,11 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
       self.decoder.to(self.dev2)
       #self.encoder.to(self.dev2)
 
-  def __init__(self, config, input_encoders=None, target_encoders=None):
+  def __init__(self, config, input_encoders=None, target_encoders=None, cfg_overrides=None):
     super().__init__()
+    if cfg_overrides is not None:
+      config = deep_merge(config, cfg_overrides, list_priority='second')
+
     if isinstance(config, dict):  # Support create from dictionary for `PyTorchModelHubMixin`
       config = Config.from_dict(config)
 
@@ -701,6 +704,7 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
   def forward(
       self,
       batch,
+      **kwargs
   ) -> Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
     """Compute the logits of the examples in `batch`
 

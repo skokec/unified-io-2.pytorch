@@ -144,7 +144,7 @@ class Trainer:
         ###################################################################################################
         # set model
         
-        model = UnifiedIOModel.from_pretrained(args['model']['name'])
+        model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=args['model'].get('kwargs'))
         model.to(device)
         model.set_dev1(device)
         model.set_dev2(device)

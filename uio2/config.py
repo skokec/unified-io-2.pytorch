@@ -144,6 +144,36 @@ class T5Config:
   audio_vit_patch_size: int = 16
 
 
+  def to_dict(self) -> Dict[str, Any]:
+      """
+      Serializes this instance to a Python dictionary.
+
+      Returns:
+          `Dict[str, Any]`: Dictionary of all the attributes that make up this configuration instance.
+      """
+      import copy
+      output = copy.deepcopy(self.__dict__)
+      if hasattr(self.__class__, "model_type"):
+          output["model_type"] = self.__class__.model_type
+      if "_auto_class" in output:
+          del output["_auto_class"]
+      if "_commit_hash" in output:
+          del output["_commit_hash"]
+      if "_attn_implementation_internal" in output:
+          del output["_attn_implementation_internal"]
+
+      for key, value in output.items():
+          # Deal with nested configs like CLIP
+          if isinstance(value, T5Config):
+              value = value.to_dict()
+              del value["transformers_version"]
+
+          output[key] = value
+
+      return output
+
+
+
 # Modality-specific processing configs
 
 @dataclass
@@ -316,7 +346,7 @@ class AudioViTVQGANConfig:
 
 DEFAULT_SEQUENCE_LEN = {
   "is_training": True,
-  "image_input_samples": 576,
+  "image_input_samples": 576,  
   "image_history_input_samples": 256,
   "audio_input_samples": 128,
   "audio_history_input_samples": 128,
@@ -361,6 +391,29 @@ class Config:
       audio_vit_cfg=AudioVitFeatureConfig(**data["audio_vit_cfg"]),
       **{k: v for k, v in data.items() if not ("cfg" in k or "vqgan" in k or k == "t5_config")}
     )
+
+def deep_merge(dict1, dict2, list_priority='merge'):
+    for key, value2 in dict2.items():
+        value1 = dict1.get(key)
+        
+        if isinstance(value1, dict) and isinstance(value2, dict):
+            # If both values are dictionaries, merge them recursively
+            deep_merge(value1, value2, list_priority=list_priority)
+        elif isinstance(value1, list) and isinstance(value2, list):
+            # If both values are lists, you can concatenate them (or merge them differently if needed)
+            if list_priority == 'merge':
+              dict1[key] = value1 + value2
+            elif list_priority == 'second':
+               dict1[key] = value2
+            elif list_priority == 'first':
+               dict1[key] = value1
+            else:
+               raise Exception("Invalid 'list_priority' value used")
+        else:
+            # If one value is not a dictionary/list, overwrite it with the second dict's value
+            dict1[key] = value2
+
+    return dict1
 
 
 # Configs used for our trained models
