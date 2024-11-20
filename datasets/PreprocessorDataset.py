@@ -6,6 +6,8 @@ from PIL import Image
 
 import json,  os
 
+import pylab as plt
+
 import torch
 from torch.utils.data import Dataset
 
@@ -30,7 +32,7 @@ def centers_to_tokens(gt_centers, img_shape):
 
 class KeypointPreprocessorDataset(Dataset):
 
-    def __init__(self, preprocessor, dataset, targets_definition, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False, apply_internal_scale_aug=False):
+    def __init__(self, preprocessor, dataset, targets_definition=None, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False, apply_internal_scale_aug=False, PLOT=False):
         self.preprocessor = preprocessor
         self.dataset = dataset
 
@@ -48,8 +50,10 @@ class KeypointPreprocessorDataset(Dataset):
                                     groundruth_key='center',
                                     prompt_key='Towel_Corners')]
 
-        self.targets_definition = targets_definition 
-        self.targets_types, self.targets_prob = zip(*[(t['type'], t['prob']) for t in self.targets_definition])
+        self.targets_definition = targets_definition
+        self.targets_types, self.targets_prob = zip(*[(i, t['prob']) for i,t in enumerate(self.targets_definition)])
+
+        self.PLOT = PLOT
 
     def __len__(self):
         return len(self.dataset)
@@ -68,10 +72,10 @@ class KeypointPreprocessorDataset(Dataset):
 
 
         # we can only process one target per sample, randomly chose one based on probabilities
-        selected_type = np.random.choice(self.targets_types, p=self.targets_prob)
+        selected_target_id = np.random.choice(self.targets_types, p=self.targets_prob)
 
 
-        selected_target = self.targets_definition[selected_type]
+        selected_target = self.targets_definition[selected_target_id]
    
         if selected_target['type'].lower() == 'keypoints':
             gt_key = selected_target['groundruth_key']
@@ -160,6 +164,16 @@ class KeypointPreprocessorDataset(Dataset):
 
         gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)
         features['text_targets'] = gt_centers_text
+        
+        if self.PLOT:
+            img = features["image_inputs"]
+            plt.clf()
+            plt.subplot(1, 1, 1)            
+            #plt.imshow(np.transpose(img,(1,2,0)))
+            plt.imshow(img)
+            
+            plt.draw(); plt.pause(0.01)
+            plt.waitforbuttonpress()	
 
         return features
         
