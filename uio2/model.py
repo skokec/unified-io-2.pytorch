@@ -393,7 +393,7 @@ class UnifiedIOModel(nn.Module, GenerationMixin, PyTorchModelHubMixin):
       input_encoders = get_input_modalities(
         config.input_modalities, config.image_vit_cfg, config.audio_vit_cfg,
         config.image_history_cfg, config.audio_history_cfg, config.use_image_vit, config.use_audio_vit,
-        config.freeze_vit, config.use_image_history_vit, config.use_audio_history_vit,
+        config.freeze_vit, config.use_image_history_vit, config.use_audio_history_vit, cfg=config
       )
       input_encoders = {k: v.get_encoder(config.t5_config) for k, v in input_encoders.items()}
       target_encoders = get_target_modalities(

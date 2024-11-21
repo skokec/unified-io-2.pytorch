@@ -2,8 +2,8 @@ import torch
 
 from uio2.model import UnifiedIOModel
 from uio2.preprocessing import UnifiedIOPreprocessor
-from uio2.runner import TaskRunner, extract_keypoints, extract_individual_keypoints
-from uio2.data_utils import resize_and_pad_default, values_to_tokens
+from uio2.runner import TaskRunner, extract_individual_keypoints
+from uio2.data_utils import values_to_tokens
 from uio2 import config
 
 from transformers import GenerationConfig
@@ -17,11 +17,11 @@ from config import get_config_args
 
 import numpy as np
 
-def detect_keypoints(runner, img_filename, **kwargs):
+def detect_keypoints(runner, img_filename, image_processed_size, **kwargs):
     p = "List coordinates of all visible towel corners"
     example = runner.uio2_preprocessor(text_inputs=p, image_inputs=img_filename, target_modality="text")
     text = runner.predict_text(example, max_tokens=32, detokenize=True, logits_processor=None, **kwargs)
-    kps = extract_individual_keypoints(text, example["/meta/image_info"])
+    kps = extract_individual_keypoints(text, example["/meta/image_info"], image_processed_size)
     
     return kps, text
 
@@ -53,8 +53,7 @@ if __name__ == "__main__":
     EVAL_EPOCH = args['eval_epoch']
     EVAL_CROPPED = args.get('eval_cropped')
     SKIP_IF_EXISTS = args.get('skip_if_exists')
-    #EVAL_TYPE = "train" # test or train
-    #EVAL_EPOCH = "_100"
+    EVAL_PRERESIZE = args.get('eval_preresize')
 
     DISPLAY_TO_FILE = args.get("display_to_file")
 
@@ -68,8 +67,32 @@ if __name__ == "__main__":
     else:
         dev = torch.device("cuda:0")
 
-        preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
-        model = UnifiedIOModel.from_pretrained(args['model']['name'],local_files_only=True)
+        model_cfg_overrides = args['model'].get('kwargs')
+        preprocessor_kwargs = args['model'].get('preprocessor_kwargs')
+
+        processing_size = args['model'].get('processing_size')
+        if processing_size:
+            if model_cfg_overrides is None:
+                model_cfg_overrides = dict()
+                
+            if 't5_config' not in model_cfg_overrides:
+                model_cfg_overrides['t5_config'] = dict()
+            if 'sequence_length' not in model_cfg_overrides:
+                model_cfg_overrides['sequence_length'] = dict()
+            if 'cfg_overrides' not in preprocessor_kwargs:
+                preprocessor_kwargs['cfg_overrides'] = dict()
+            if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
+                preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
+
+            from uio2 import config
+
+            model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
+            model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+
+            preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        
+        preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **preprocessor_kwargs)
+        model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=model_cfg_overrides, local_files_only=True)
 
         
         state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
@@ -183,6 +206,24 @@ if __name__ == "__main__":
                 })
         else:
             RESIZE_FACTOR=1.0
+
+            if EVAL_PRERESIZE:
+                
+                if 'x' in EVAL_PRERESIZE:
+                    TEST_SIZE_H, TEST_SIZE_W = map(int,EVAL_PRERESIZE.split("x"))
+                else:
+                    TEST_SIZE_H = TEST_SIZE_W = int(EVAL_PRERESIZE)
+
+                transform.append(
+                    {
+                        'name': 'Resize',
+                        'opts': {
+                            'keys': ('image',),
+                            'interpolation': (InterpolationMode.BILINEAR,),
+                            'keys_bbox': ('center',),
+                            'size': (TEST_SIZE_H, TEST_SIZE_W),
+                        }
+                    })
         
         #/storage/datasets/ClothDataset
         #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
@@ -190,7 +231,7 @@ if __name__ == "__main__":
         db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=RESIZE_FACTOR, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
                           transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
-        db = KeypointPreprocessorDataset(preprocessor, db, returned_raw_sample=True, randomize_keypoints_order=False)
+        db = KeypointPreprocessorDataset(preprocessor, db, full_config=model.full_config, returned_raw_sample=True, randomize_keypoints_order=False, apply_internal_scale_aug=True)
         # prepare training data
         train_imgs = []
         train_prompts = []
@@ -201,6 +242,8 @@ if __name__ == "__main__":
         eval = CenterGlobalMinimizationEval("")
 
         results = dict()
+
+        IMAGE_PROCESS_SIZE = model.config.image_vit_patch_size if model.full_config.use_image_vit else model.config.image_patch_size
 
         for i,preeprocessed_sample in enumerate(tqdm(db)):
             #if i % 8 != 0:
@@ -218,7 +261,7 @@ if __name__ == "__main__":
             #gt_kps[:,1] *= img.shape[2]/config.IMAGE_INPUT_SIZE[0]
 
             gt_centers_text = preprocessor.tokenizer.decode(preeprocessed_sample['/targets/text/targets'])
-            gt_kps = extract_individual_keypoints(gt_centers_text, preeprocessed_sample["/meta/image_info"])
+            gt_kps = extract_individual_keypoints(gt_centers_text, preeprocessed_sample["/meta/image_info"], IMAGE_PROCESS_SIZE)
 
             train_prompts.append(f"List coordinates of all visible towel corners in <image_input>: {gt_centers_text}")
             train_imgs.append(img)

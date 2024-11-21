@@ -45,6 +45,7 @@ def get_input_modalities(
     freeze_vit=False,
     use_image_history_vit = False,
     use_audio_history_vit = False,
+    cfg = None
 ) -> Dict[str, ModalityEncoder]:
   """Returns the ModalityEncoder for the input modalities"""
 
@@ -64,7 +65,7 @@ def get_input_modalities(
 
   if 'image' in input_modality:
     out["image"] = InputImageViTEncoder(
-      image_encoder if use_image_vit else None, use_image_vit, freeze_vit)
+      image_encoder if use_image_vit else None, use_image_vit, freeze_vit, cfg=cfg)
 
   if 'image_history' in input_modality:
     encoder = image_encoder if use_image_history_vit else None

@@ -11,6 +11,7 @@ from transformers import ProcessorMixin, FeatureExtractionMixin
 from transformers.utils import PushToHubMixin
 
 from uio2 import config
+from uio2.config import deep_merge
 from uio2.audio_utils import load_audio
 from uio2.config import get_tokenizer, Config
 from uio2.data_utils import resize_and_pad_default, values_to_tokens
@@ -32,7 +33,7 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
     input_encoders = get_input_modalities(
       cfg.input_modalities, cfg.image_vit_cfg, cfg.audio_vit_cfg,
       cfg.image_history_cfg, cfg.audio_history_cfg, cfg.use_image_vit, cfg.use_audio_vit,
-      cfg.freeze_vit, cfg.use_image_history_vit, cfg.use_audio_history_vit,
+      cfg.freeze_vit, cfg.use_image_history_vit, cfg.use_audio_history_vit, cfg=cfg,
     )
     target_encoders = get_target_modalities(
       cfg.target_modalities, cfg.image_vqgan, cfg.audio_vqgan)
@@ -40,10 +41,16 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
       input_encoders, target_encoders, cfg.sequence_length, tokenizer, cfg)
 
   @staticmethod
-  def from_dict(data, tokenizer=None, sequence_length=None):
+  def from_dict(data, tokenizer=None, sequence_length=None, cfg_overrides=None):
     if tokenizer is None:
       raise ValueError("Tokenizer path must be given: `tokenizer=path/to/tokenizer`")
-    cfg = Config.from_dict(data["config"])
+    
+    config = data["config"]
+    if cfg_overrides is not None:
+      config = deep_merge(config, cfg_overrides, list_priority='second')
+
+    cfg = Config.from_dict(config)
+
     if sequence_length is not None:
       cfg.sequence_length = sequence_length
     return UnifiedIOPreprocessor.from_config(cfg, tokenizer)
@@ -165,7 +172,7 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
     if image_history is not None:
       assert video_inputs is None
       image_history = [self.load_image(x) if isinstance(x, str) else x for x in image_history]
-      parts = [resize_and_pad_default(x, is_training, is_input=True, is_history=True)
+      parts = [resize_and_pad_default(x, is_training, is_input=True, is_history=True, cfg=self.config.t5_config)
                for x in image_history]
       features["image_history_inputs"] = tf.stack([x[0] for x in parts])
       features["image_history_input_masks"] = tf.stack([x[1] for x in parts])
@@ -189,18 +196,18 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
 
       if encode_frame_as_image is None:
         video_inputs, video_mask, _ = resize_and_pad_default(
-          video_inputs, is_training, is_input=True, is_history=True)
+          video_inputs, is_training, is_input=True, is_history=True, cfg=self.config.t5_config)
       elif not is_training:
         image_inputs = video_inputs[encode_frame_as_image]
         video_inputs = np.delete(video_inputs, encode_frame_as_image, axis=0)
         video_inputs, video_mask, _ = resize_and_pad_default(
-          video_inputs, is_training, is_input=True, is_history=True)
+          video_inputs, is_training, is_input=True, is_history=True, cfg=self.config.t5_config)
       else:
         # Make sure augmentation effects the image and history in the same way
         # by applying `resize_and_pad_default` to them in the same way
         video_inputs, video_mask, resize_meta = resize_and_pad_default(
           video_inputs, is_training, boxes=boxes,
-          masks=image_targets, is_input=True)
+          masks=image_targets, is_input=True, cfg=self.config.t5_config)
         features["meta/image_info"] = resize_meta[1]
         features["image_inputs"] = video_inputs[encode_frame_as_image]
         features["image_input_masks"] = video_mask[encode_frame_as_image]
@@ -250,7 +257,7 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
     if image_inputs is not None:
       image_inputs, image_inputs_mask, resize_meta = resize_and_pad_default(
         image_inputs, is_training, boxes=boxes,
-        masks=image_targets, is_input=True)
+        masks=image_targets, is_input=True, cfg=self.config.t5_config)
       features["image_inputs"] = image_inputs
       features["image_input_masks"] = image_inputs_mask
 
@@ -279,7 +286,7 @@ class UnifiedIOPreprocessor(FeatureExtractionMixin):
       else:
         # Resize the image independently
         image_targets, image_targets_mask, other = resize_and_pad_default(
-          image_targets, is_training, is_input=False)
+          image_targets, is_training, is_input=False, cfg=self.config.t5_config)
         features["image_targets"] = image_targets
         features["image_target_masks"] = image_targets_mask
 

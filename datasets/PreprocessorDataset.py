@@ -32,7 +32,7 @@ def centers_to_tokens(gt_centers, img_shape):
 
 class KeypointPreprocessorDataset(Dataset):
 
-    def __init__(self, preprocessor, dataset, targets_definition=None, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False, apply_internal_scale_aug=False, PLOT=False):
+    def __init__(self, preprocessor, dataset, full_config, targets_definition=None, returned_raw_sample=False, randomize_keypoints_order=True, jitter_keypoints_px=False, apply_internal_scale_aug=False, PLOT=False):
         self.preprocessor = preprocessor
         self.dataset = dataset
 
@@ -54,6 +54,15 @@ class KeypointPreprocessorDataset(Dataset):
         self.targets_types, self.targets_prob = zip(*[(i, t['prob']) for i,t in enumerate(self.targets_definition)])
 
         self.PLOT = PLOT
+
+        self.full_config = full_config
+
+        from uio2 import config
+        self.input_image_size = config.IMAGE_INPUT_SIZE
+
+        if full_config is not None:
+            self.input_image_size = full_config.t5_config.default_image_vit_size if full_config.use_image_vit else full_config.t5_config.default_image_size
+
 
     def __len__(self):
         return len(self.dataset)
@@ -119,7 +128,7 @@ class KeypointPreprocessorDataset(Dataset):
 
     # use this function to create keypoints based on actual image translation and convert them to text_target
     def _generate_keypoint_target(self, features, keypoints):
-        from uio2 import config            
+   
         gt_centers = keypoints[(keypoints[:, 0] > 0) | (keypoints[:, 1] > 0), :]
         if len(gt_centers) == 0:
             features['text_targets'] = "No points found"
@@ -137,7 +146,7 @@ class KeypointPreprocessorDataset(Dataset):
         gt_centers = gt_centers[:,[1,0]]
 
         # remove keypoints that could fall outside of image (e.g., due to internal scale augmentation that also crops the image)
-        gt_centers = np.array([[x,y] for x,y in gt_centers if x >=0 and x<config.IMAGE_INPUT_SIZE[1]-1 and y >=0 and y<config.IMAGE_INPUT_SIZE[0]-1])
+        gt_centers = np.array([[x,y] for x,y in gt_centers if x >=0 and x<self.input_image_size[1]-1 and y >=0 and y<self.input_image_size[0]-1])
 
         if len(gt_centers) == 0:
             features['text_targets'] = "No points found"
@@ -158,11 +167,11 @@ class KeypointPreprocessorDataset(Dataset):
             gt_centers += jitter
 
             # clip it within range
-            gt_centers[:,0] = np.clip(gt_centers[:,0],0, config.IMAGE_INPUT_SIZE[1]-1)
-            gt_centers[:,1] = np.clip(gt_centers[:,1],0, config.IMAGE_INPUT_SIZE[0]-1)
+            gt_centers[:,0] = np.clip(gt_centers[:,0],0, self.input_image_size[1]-1)
+            gt_centers[:,1] = np.clip(gt_centers[:,1],0, self.input_image_size[0]-1)
 
 
-        gt_centers_text = centers_to_tokens(gt_centers, config.IMAGE_INPUT_SIZE)
+        gt_centers_text = centers_to_tokens(gt_centers, self.input_image_size)
         features['text_targets'] = gt_centers_text
         
         if self.PLOT:
@@ -173,7 +182,7 @@ class KeypointPreprocessorDataset(Dataset):
             plt.imshow(img)
             
             plt.draw(); plt.pause(0.01)
-            plt.waitforbuttonpress()	
+            #plt.waitforbuttonpress()	
 
         return features
         

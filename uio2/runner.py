@@ -89,7 +89,7 @@ def extract_labelled_boxes(text):
   return boxes, labels
 
 
-def extract_keypoints(text, image_info):
+def extract_keypoints(text, image_info, image_processed_size):
   """Extract keypoint prediction from UIO output text"""
   invalid = False  # Is this text a valid keypoint prediction
   points, labels = [], []
@@ -101,7 +101,7 @@ def extract_keypoints(text, image_info):
     else:
       invalid = False
   points = extra_id_to_float(np.array(points))
-  points *= config.IMAGE_INPUT_SIZE[0]
+  points *= image_processed_size[0] 
 
   part_map = {k: i for i, k in enumerate(HUMAN_POSE_PART)}
   output_points = np.zeros([17, 2])
@@ -138,7 +138,7 @@ def extract_keypoints(text, image_info):
 
 individual_keypoints_re=re.compile(r"<extra_id_([0-9]+)> <extra_id_([0-9]+)>")
 
-def extract_individual_keypoints(text, image_info, ):
+def extract_individual_keypoints(text, image_info, image_processed_size):
   """Extract keypoint prediction from UIO output text"""
   points = []
   for id1, id2 in individual_keypoints_re.findall(text):
@@ -150,7 +150,7 @@ def extract_individual_keypoints(text, image_info, ):
     return np.array([])
 
   points = extra_id_to_float(np.array(points))
-  points *= config.IMAGE_INPUT_SIZE[0]
+  points *= image_processed_size[0]
   
   if image_info is not None :
     points = undo_box_preprocessing(np.tile(points, [1, 2]), image_info)[:, :2]
@@ -261,6 +261,12 @@ class TaskRunner:
     self.prompt = prompts
     self.spectogram_converter = SpectogramConverter(use_hifigan_for_audio)
 
+    full_config = self.model.full_config
+
+    self.input_image_size = config.IMAGE_INPUT_SIZE
+    if self.cfg is not None:
+      self.input_image_size = full_config.t5_config.default_image_vit_size if full_config.use_image_vit else full_config.t5_config.default_image_size
+
   @property
   def tokenizer(self):
     return self.uio2_preprocessor.tokenizer
@@ -301,7 +307,7 @@ class TaskRunner:
     if len(tokens) != 6 or (tokens[0] != 0) or (tokens[-1] != 1):
       raise ValueError(f"Output not a bounding box {tokens}")
     box = token_to_float(np.array(tokens[1:-1]))
-    box *= config.IMAGE_INPUT_SIZE[0]  # de-normalized w.r.t the preprocessed image
+    box *= self.input_image_size[0] # de-normalized w.r.t the preprocessed image
     box = undo_box_preprocessing(box, batch["/meta/image_info"])  # -> coordinates for the input image
     box = box.tolist()
     box = [box[1], box[0], box[3], box[2]]  # yxyx to xyxy
@@ -392,7 +398,7 @@ class TaskRunner:
       detokenize=False)
     boxes = extract_locations_from_token_ids(out)
     if len(boxes) > 0:
-      boxes = boxes*config.IMAGE_INPUT_SIZE[0]
+      boxes = boxes*self.input_image_size[0]
       boxes = undo_box_preprocessing(boxes, batch["/meta/image_info"])
       if nms is not None and len(boxes) > 1:
         ixs = tf.image.non_max_suppression(
@@ -428,7 +434,7 @@ class TaskRunner:
     text = self.predict_text(
       batch, max_tokens=128,
       logits_processor=None if free_form else [ForceKeypointPrediction(self.tokenizer)])
-    kps, valid = extract_keypoints(text, batch["/meta/image_info"])
+    kps, valid = extract_keypoints(text, batch["/meta/image_info"], self.input_image_size)
     return kps, text
 
   def keypoint(self, image):
@@ -461,7 +467,7 @@ class TaskRunner:
       batch, max_tokens=max_tokens, logits_processor=[PredictBoxesPreprocessor(thresh)])
     boxes, labels = extract_labelled_boxes(out)
     if len(boxes) > 0:
-      boxes = boxes*config.IMAGE_INPUT_SIZE[0]
+      boxes = boxes*self.input_image_size[0]
       boxes = undo_box_preprocessing(boxes, batch["/meta/image_info"])
       if nms is not None and len(boxes) > 1:
         ixs = tf.image.non_max_suppression(

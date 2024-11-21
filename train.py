@@ -130,26 +130,39 @@ class Trainer:
             if not args['train_dataset'].get('force_workers_on_distributed_processing'):
                 dataset_workers = 0 # ignore workers request since already using separate processes for each GPU
 
-        #############################################################################################
-        # DATASET
-        preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
-
-        #train_dataset = get_dataset(args['train_dataset']['name'], args['train_dataset']['kwargs'], preprocessor=preprocessor)
-        train_dataset = get_dataset(args['train_dataset']['name'], args['train_dataset']['kwargs'], preprocessor=None)
-
-        train_dataset_it = torch.utils.data.DataLoader(train_dataset, batch_size=dataset_batch, num_workers=dataset_workers, 
-                                                       pin_memory=True if args['cuda'] else False, shuffle=dataset_shuffle, 
-                                                       collate_fn=variable_len_collate)
-
         ###################################################################################################
         # set model
-        
-        model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=args['model'].get('kwargs'))
-        model.to(device)
-        model.set_dev1(device)
-        model.set_dev2(device)
+        model_cfg_overrides = args['model'].get('kwargs')
+        preprocessor_kwargs = args['model'].get('preprocessor_kwargs')
 
-        model = self._to_data_parallel(model, dim=0)
+        processing_size = args['model'].get('processing_size')
+        if processing_size:
+            from uio2 import config
+
+            if model_cfg_overrides is None:
+                model_cfg_overrides = dict()
+
+            if 't5_config' not in model_cfg_overrides:
+                model_cfg_overrides['t5_config'] = dict()
+            if 'sequence_length' not in model_cfg_overrides:
+                model_cfg_overrides['sequence_length'] = dict()
+
+            model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
+            model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+
+            if 'cfg_overrides' not in preprocessor_kwargs:
+                preprocessor_kwargs['cfg_overrides'] = dict()
+            if 't5_config' not in preprocessor_kwargs['cfg_overrides']:
+                preprocessor_kwargs['cfg_overrides']['t5_config'] = dict()
+            if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
+                preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
+
+            preprocessor_kwargs['cfg_overrides']['t5_config']['default_image_vit_size'] = tuple(processing_size)
+            preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        
+        preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **preprocessor_kwargs)
+
+        model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=model_cfg_overrides)
 
         def get_optimizer(model_, args_):
             if args_ is None or args_.get('disabled'):
@@ -172,6 +185,17 @@ class Trainer:
 
         if args.get('resume') and not args.get('resume_path'):
             args['resume_path'] = self._get_last_checkpoint()
+
+        #############################################################################################
+        # DATASET
+
+        #train_dataset = get_dataset(args['train_dataset']['name'], args['train_dataset']['kwargs'], preprocessor=preprocessor, model_full_config=model.module.full_config)
+        train_dataset = get_dataset(args['train_dataset']['name'], args['train_dataset']['kwargs'], preprocessor=None)
+
+        train_dataset_it = torch.utils.data.DataLoader(train_dataset, batch_size=dataset_batch, num_workers=dataset_workers, 
+                                                       pin_memory=True if args['cuda'] else False, shuffle=dataset_shuffle, 
+                                                       collate_fn=variable_len_collate)
+
 
         ########################################################################################################################
         # Logger
@@ -273,7 +297,7 @@ class Trainer:
             train_preprocessor_args = dict()
 
         from datasets.PreprocessorDataset import KeypointPreprocessorDataset
-        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None, PLOT=False, **train_preprocessor_args)
+        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None, full_config=model.module.full_config, PLOT=False, **train_preprocessor_args)
 
 
         for i, sample in enumerate(tqdm_iterator if tqdm_iterator is not None else train_dataset_it):

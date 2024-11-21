@@ -124,7 +124,7 @@ def denormalize_boxes(boxes, image_shape):
 def resize_and_pad_default(
     image, is_training, is_input=True, masks=None, boxes=None, box_labels=None,
     random_scale_min=None, random_scale_max=None, random_scale_ratio=None,
-    resize_method=None, is_history=False
+    resize_method=None, is_history=False, cfg=None
 ):
   """Apply `resize_and_pad` with default settings"""
   image = tf.image.convert_image_dtype(image, dtype=tf.float32)
@@ -139,9 +139,9 @@ def resize_and_pad_default(
   if resize_method is None:
     resize_method ='random' if is_training else tf.image.ResizeMethod.BILINEAR
   if is_history:
-    output_size = config.IMAGE_HISTORY_INPUT_SIZE
+    output_size = config.IMAGE_HISTORY_INPUT_SIZE if cfg is None else cfg.default_image_history_vit_size
   elif is_input:
-    output_size = config.IMAGE_INPUT_SIZE
+    output_size = config.IMAGE_INPUT_SIZE if cfg is None else cfg.default_image_vit_size
   else:
     assert masks is None
     output_size = config.IMAGE_TARGET_SIZE

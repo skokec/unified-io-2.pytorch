@@ -2,7 +2,7 @@ from .ViCoSClothDataset import ClothDataset
 from .MuJoCoDataset import MuJoCoDataset
 from .PreprocessorDataset import KeypointPreprocessorDataset
 
-def get_dataset(name, dataset_opts, preprocessor=None):
+def get_dataset(name, dataset_opts, preprocessor=None, model_full_config=None):
     if name.lower() == "concat":
         from torch.utils.data import ConcatDataset
         dataset = ConcatDataset([get_dataset(db['name'], db['kwargs']) for db in dataset_opts])
@@ -15,6 +15,6 @@ def get_dataset(name, dataset_opts, preprocessor=None):
         raise RuntimeError("Dataset {} not available".format(name))
 
     if preprocessor is not None:
-        dataset = KeypointPreprocessorDataset(preprocessor, dataset)
+        dataset = KeypointPreprocessorDataset(preprocessor, dataset, full_config=model_full_config)
 
     return dataset

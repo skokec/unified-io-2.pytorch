@@ -2,8 +2,8 @@ import torch
 
 from uio2.model import UnifiedIOModel
 from uio2.preprocessing import UnifiedIOPreprocessor
-from uio2.runner import TaskRunner, extract_keypoints, extract_individual_keypoints
-from uio2.data_utils import resize_and_pad_default, values_to_tokens
+from uio2.runner import TaskRunner, extract_individual_keypoints
+from uio2.data_utils import values_to_tokens
 
 import pylab as plt
 from PIL import Image
@@ -12,14 +12,14 @@ import os
 
 import numpy as np
 
-def detect_keypoints(runner, img_filename):
+def detect_keypoints(runner, img_filename, image_processed_size):
     #p = runner.prompt.random_prompt("VQA_short_prompt")
     #p = p.replace("{}", "Where are corners of the towel in this image. Return as keypoints.")
     #p = p.replace("{}", "List coordinates of all visible towel corners. Return as keypoints.")
     p = "List coordinates of all visible towel corners in <image_input>"
     example = runner.uio2_preprocessor(text_inputs=p, image_inputs=img_filename, target_modality="text")
     text = runner.predict_text(example, max_tokens=32, detokenize=True, logits_processor=None)
-    kps = extract_individual_keypoints(text, example["/meta/image_info"])
+    kps = extract_individual_keypoints(text, example["/meta/image_info"], image_processed_size)
     
     return kps, text
 
@@ -203,7 +203,9 @@ if __name__ == "__main__":
         #                                         "/storage/datasets/ClothDataset/ClothDatasetVICOS/bg=white_desk/cloth=big_towel/rgb/image_0000_view0_ls6_camera0.jpg",
         #                                         "/storage/datasets/ClothDataset/ClothDatasetVICOS/bg=white_desk/cloth=big_towel/rgb/image_0000_view0_ls0_camera0.jpg"], img_filename)
         
-        kps, text = detect_keypoints(runner, img_filename)
+        IMAGE_PROCESS_SIZE = model.config.image_vit_patch_size if model.full_config.use_image_vit else model.config.image_patch_size
+
+        kps, text = detect_keypoints(runner, img_filename, IMAGE_PROCESS_SIZE)
         print(text)
         print(kps)
 

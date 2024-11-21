@@ -175,11 +175,12 @@ class ViTImageEmbedder(nn.Module):
 
 
 class InputImageViTEncoder(ModalityEncoder):
-  def __init__(self, image_encoder, use_vit = False, freeze_vit = True) -> None:
+  def __init__(self, image_encoder, use_vit = False, freeze_vit = True, cfg = None) -> None:
     super().__init__()
     self.image_encoder = image_encoder
     self.use_vit = use_vit
     self.freeze_vit = freeze_vit
+    self.cfg = cfg
     
   def get_encoder(self, config: T5Config) -> nn.Module:
     return ViTImageEmbedder(self.image_encoder, config, "image", self.use_vit, self.freeze_vit)
@@ -189,8 +190,9 @@ class InputImageViTEncoder(ModalityEncoder):
     if image_inputs is None:
       return {}
 
-    image_input_size = config.IMAGE_INPUT_SIZE
-    input_padding_size = np.array(image_input_size, dtype=np.int32) // config.IMAGE_INPUT_D
+    PATCH_SIZE = config.IMAGE_INPUT_D if self.cfg is None else self.cfg.t5_config.image_vit_patch_size
+    image_input_size = config.IMAGE_INPUT_SIZE if self.cfg is None else self.cfg.t5_config.default_image_vit_size
+    input_padding_size = np.array(image_input_size, dtype=np.int32) // PATCH_SIZE
     n_patches = np.prod(input_padding_size)
 
     image_samples = sequence_length.get('image_input_samples', None)
@@ -239,7 +241,7 @@ class InputImageViTEncoder(ModalityEncoder):
     # Arrange into a list of patches
     image_inputs = einops.rearrange(
       image_inputs, '(h dh) (w dw) c -> (h w) (dh dw c)',
-      dh=config.IMAGE_INPUT_D, dw=config.IMAGE_INPUT_D)
+      dh=PATCH_SIZE, dw=PATCH_SIZE)
 
     if image_samples < n_patches:
       image_encoder_pos_ids = sample_patches(image_input_masks, image_samples)

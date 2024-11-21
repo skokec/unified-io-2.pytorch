@@ -11,7 +11,6 @@ OUTPUT_DIR = os.environ.get('OUTPUT_DIR','./exp')
 USE_DEPTH = False
 
 import numpy as np
-from uio2 import config
 
 def rotate_orientation_values(orientation, angle):
 	# every value in orientation (in radians) should be rotated by provided angle (in degrees) and returned	
@@ -131,24 +130,8 @@ args = dict(
 	model = dict(
 		name='allenai/uio2-large', 
         #name='allenai/uio2-large-bfloat16',
-        kwargs=dict(
-            t5_config=dict(
-                default_image_vit_size=tuple(config.IMAGE_INPUT_SIZE)
-			),
-            sequence_length=dict(image_input_samples=(config.IMAGE_INPUT_SIZE[0]//config.IMAGE_INPUT_D)*(config.IMAGE_INPUT_SIZE[1]//config.IMAGE_INPUT_D) )
-		),
         preprocessor='allenai/uio2-preprocessor',
-        preprocessor_kwargs=dict(tokenizer=LLAMA2_TOKENIZER,
-                                 sequence_length={
-									"is_training": True,
-									"image_input_samples": (config.IMAGE_INPUT_SIZE[0]//config.IMAGE_INPUT_D)*(config.IMAGE_INPUT_SIZE[1]//config.IMAGE_INPUT_D) ,
-									"image_history_input_samples": 256,
-									"audio_input_samples": 128,
-									"audio_history_input_samples": 128,
-									'num_frames': 4,
-									},
-                                ),
-
+        preprocessor_kwargs=dict(tokenizer=LLAMA2_TOKENIZER),
 		optimizer='Adam',
         #lambda_scheduler_fn=lambda _args: (lambda epoch: pow((1-((epoch)/_args['n_epochs'])), 0.9)),
         lambda_scheduler_fn=lambda _args: (lambda epoch: 1.0), # disabled
