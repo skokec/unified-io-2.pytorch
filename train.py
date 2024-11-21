@@ -197,6 +197,25 @@ class Trainer:
                     print('WARNING: Current model differs from the pretrained one, loading weights using strict=False')
                     print('WARNING: #####################################################################################################')
 
+        peft_args = args['model'].get('finetune_adapter')
+        if peft_args and peft_args.get('enable'):
+            from peft import LoraConfig, get_peft_model, TaskType
+            if peft_args['name'].lower() == 'lora':
+                peft_config = LoraConfig(**peft_args['kwargs'])
+            else:
+                raise Exception("Unsupported PEFT. Available only: LoRA")
+
+            model = get_peft_model(model, peft_config)
+            model.print_trainable_parameters()
+
+        # send to device AFTER adding LoRA (PEFT)
+        model.to(device)
+        model.set_dev1(device)
+        model.set_dev2(device)
+
+        model = self._to_data_parallel(model, dim=0)
+
+
         self.device = device
         self.train_dataset_it, self.dataset_batch = train_dataset_it, dataset_batch
         self.model, self.preprocessor = model, preprocessor
@@ -235,7 +254,7 @@ class Trainer:
 
         # put model into training mode
         model.train()
-       
+
         # define meters
         loss_meter = AverageMeter()
 
@@ -254,7 +273,7 @@ class Trainer:
             train_preprocessor_args = dict()
 
         from datasets.PreprocessorDataset import KeypointPreprocessorDataset
-        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None, **train_preprocessor_args)
+        train_preprocessor = KeypointPreprocessorDataset(preprocessor=preprocessor, dataset=None, PLOT=False, **train_preprocessor_args)
 
 
         for i, sample in enumerate(tqdm_iterator if tqdm_iterator is not None else train_dataset_it):
@@ -274,7 +293,7 @@ class Trainer:
             else:
                 batch = sample
             
-            out = model(batch)
+            out = model(batch=batch)
             
             total_loss = 0
             for modality, (logits, targets, mask) in out.items():

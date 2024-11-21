@@ -574,10 +574,10 @@ class MultiHeadDotProductAttention(nn.Module):
     self.attn_drop = Dropout(dropout_rate, broadcast_dims=dropout_broadcast_dims)
     
     # output projection
-    self.out = nn.Linear(emb_dim, emb_dim, bias=use_bias)
-    nn.init.kaiming_normal_(self.out.weight, mode='fan_in', nonlinearity='linear')
+    self.out_proj = nn.Linear(emb_dim, emb_dim, bias=use_bias)
+    nn.init.kaiming_normal_(self.out_proj.weight, mode='fan_in', nonlinearity='linear')
     if use_bias:
-      nn.init.zeros_(self.out.bias)
+      nn.init.zeros_(self.out_proj.bias)
 
   def forward(
       self,
@@ -678,7 +678,7 @@ class MultiHeadDotProductAttention(nn.Module):
     
     x = x.reshape(bs, q_len, emb_dim)
     # Back to the original inputs dimensions.
-    out = self.out(x)
+    out = self.out_proj(x)
     return out
 
 
