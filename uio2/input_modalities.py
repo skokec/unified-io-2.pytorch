@@ -195,10 +195,6 @@ class InputImageViTEncoder(ModalityEncoder):
     input_padding_size = np.array(image_input_size, dtype=np.int32) // PATCH_SIZE
     n_patches = np.prod(input_padding_size)
 
-    print("PATCH_SIZE: ", PATCH_SIZE)
-    print("image_samples: ", sequence_length.get('image_input_samples', None))
-    print("image_input_size: ", image_input_size)
-
     image_samples = sequence_length.get('image_input_samples', None)
     if image_samples is None:
       image_samples = n_patches
