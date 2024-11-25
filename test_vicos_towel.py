@@ -93,7 +93,7 @@ if __name__ == "__main__":
             preprocessor_kwargs['cfg_overrides']['t5_config'] = dict()
 
         preprocessor_kwargs['cfg_overrides']['t5_config']['default_image_vit_size'] = tuple(processing_size)
-        preprocessor_kwargs['cfg_overrides']['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        #preprocessor_kwargs['cfg_overrides']['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
         preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
 
         OUTPUT_RESULT_DIR = os.path.join(OUTPUT_RESULT_DIR, f"processing_size={processing_size[0]}x{processing_size[1]}")
