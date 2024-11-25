@@ -53,12 +53,14 @@ if __name__ == "__main__":
     EVAL_EPOCH = args['eval_epoch']
     EVAL_CROPPED = args.get('eval_cropped')
     SKIP_IF_EXISTS = args.get('skip_if_exists')
+    EVAL_RESIZE = args.get('eval_resize')
     #EVAL_TYPE = "train" # test or train
     #EVAL_EPOCH = "_100"
 
     DISPLAY_TO_FILE = args.get("display_to_file")
 
-    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl")
+    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "eval_size=512x512", "results.pkl")
+    #OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "results.pkl")
 
     if EVAL_CROPPED:
         OUTPUT_RESULT = OUTPUT_RESULT.replace("results.pkl","results_cropped_img.pkl")
@@ -69,7 +71,7 @@ if __name__ == "__main__":
         dev = torch.device("cuda:0")
 
         preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **args['model']['preprocessor_kwargs'])
-        model = UnifiedIOModel.from_pretrained(args['model']['name'],local_files_only=True)
+        model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=args['model'].get('kwargs'),local_files_only=True)
 
         
         state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
@@ -183,7 +185,25 @@ if __name__ == "__main__":
                 })
         else:
             RESIZE_FACTOR=1.0
-        
+
+            if EVAL_RESIZE is not None:
+                
+                if 'x' in EVAL_RESIZE:
+                    TEST_SIZE_H, TEST_SIZE_W = map(int,EVAL_RESIZE.split("x"))
+                else:
+                    TEST_SIZE_H = TEST_SIZE_W = int(EVAL_RESIZE)
+
+                transform.append(
+                    {
+                        'name': 'Resize',
+                        'opts': {
+                            'keys': ('image',),
+                            'interpolation': (InterpolationMode.BILINEAR,),
+                            'keys_bbox': ('center',),
+                            'size': (TEST_SIZE_H, TEST_SIZE_W),
+                        }
+                    })
+
         #/storage/datasets/ClothDataset
         #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
         CLOTH_DATASET_VICOS = os.environ.get('VICOS_TOWEL_DATASET')
@@ -283,7 +303,15 @@ if __name__ == "__main__":
                 kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
                 kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
 
+            if 'Resize' in sample:
+                resize_factors = sample['Resize']
+
+                kps = kps.reshape(-1,2)
                 
+                kps[:,0] = (kps[:,0]/ resize_factors[0] )/RESIZE_FACTOR
+                kps[:,1] = (kps[:,1]/ resize_factors[1] )/RESIZE_FACTOR
+
+
             results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
 
         
