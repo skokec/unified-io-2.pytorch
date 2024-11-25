@@ -54,55 +54,71 @@ if __name__ == "__main__":
     EVAL_CROPPED = args.get('eval_cropped')
     SKIP_IF_EXISTS = args.get('skip_if_exists')
     EVAL_PRERESIZE = args.get('eval_preresize')
+    
+    if EVAL_PRERESIZE:
+        if 'x' in EVAL_PRERESIZE:
+            TEST_SIZE_H, TEST_SIZE_W = map(int,EVAL_PRERESIZE.split("x"))
+        else:
+            TEST_SIZE_H = TEST_SIZE_W = int(EVAL_PRERESIZE)
 
     DISPLAY_TO_FILE = args.get("display_to_file")
+    
+    OUTPUT_RESULT_DIR = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}")
 
-    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "eval_size=512x512", "results.pkl")
-    #OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "results.pkl")
+    model_cfg_overrides = args['model'].get('kwargs')
+    preprocessor_kwargs = args['model'].get('preprocessor_kwargs')
+
+    processing_size = args['model'].get('processing_size')
+    if processing_size:
+        if model_cfg_overrides is None:
+            model_cfg_overrides = dict()
+            
+        if 't5_config' not in model_cfg_overrides:
+            model_cfg_overrides['t5_config'] = dict()
+        if 'sequence_length' not in model_cfg_overrides:
+            model_cfg_overrides['sequence_length'] = dict()
+
+        from uio2 import config
+
+        model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
+        model_cfg_overrides['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        
+
+        if 'cfg_overrides' not in preprocessor_kwargs:
+            preprocessor_kwargs['cfg_overrides'] = dict()
+        if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
+            preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
+        if 't5_config' not in preprocessor_kwargs['cfg_overrides']:
+            preprocessor_kwargs['cfg_overrides']['t5_config'] = dict()
+
+        preprocessor_kwargs['cfg_overrides']['t5_config']['default_image_vit_size'] = tuple(processing_size)
+        preprocessor_kwargs['cfg_overrides']['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+
+        OUTPUT_RESULT_DIR = os.path.join(OUTPUT_RESULT_DIR, f"processing_size={processing_size[0]}x{processing_size[1]}")
+
+    if EVAL_PRERESIZE:
+        OUTPUT_RESULT_DIR = os.path.join(OUTPUT_RESULT_DIR, f"preresize_size={TEST_SIZE_H}x{TEST_SIZE_W}")
+
 
     if EVAL_CROPPED:
-        OUTPUT_RESULT = OUTPUT_RESULT.replace("results.pkl","results_cropped_img.pkl")
+        OUTPUT_RESULT = os.path.join(OUTPUT_RESULT_DIR, "results_cropped_img.pkl")
+    else:
+        OUTPUT_RESULT = os.path.join(OUTPUT_RESULT_DIR, "results.pkl")
 
     if SKIP_IF_EXISTS and os.path.exists(OUTPUT_RESULT):
         print(f"Skipping due to found existing results {OUTPUT_RESULT}")
     else:
         dev = torch.device("cuda:0")
 
-        model_cfg_overrides = args['model'].get('kwargs')
-        preprocessor_kwargs = args['model'].get('preprocessor_kwargs')
-
-        processing_size = args['model'].get('processing_size')
-        if processing_size:
-            if model_cfg_overrides is None:
-                model_cfg_overrides = dict()
-                
-            if 't5_config' not in model_cfg_overrides:
-                model_cfg_overrides['t5_config'] = dict()
-            if 'sequence_length' not in model_cfg_overrides:
-                model_cfg_overrides['sequence_length'] = dict()
-
-            from uio2 import config
-
-            model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
-            model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
-
-            if 'cfg_overrides' not in preprocessor_kwargs:
-                preprocessor_kwargs['cfg_overrides'] = dict()
-            if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
-                preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
-            if 't5_config' not in preprocessor_kwargs['cfg_overrides']:
-                preprocessor_kwargs['cfg_overrides']['t5_config'] = dict()
-
-            preprocessor_kwargs['cfg_overrides']['t5_config']['default_image_vit_size'] = tuple(processing_size)
-            preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
-        
         preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **preprocessor_kwargs)
         model = UnifiedIOModel.from_pretrained(args['model']['name'], cfg_overrides=model_cfg_overrides, local_files_only=True)
 
         
         state = torch.load(os.path.join(EVAL_FOLDER,f"checkpoint{EVAL_EPOCH}.pth"))
 
-        model_state_dict = {k.replace("module.",""):v for k,v in state['model_state_dict'].items()}
+        model_state_dict = {k.replace("module.","").replace(".out.",".out_proj."):v for k,v in state['model_state_dict'].items()}
         model.load_state_dict(model_state_dict, strict=True)
         model.to(dev)
 
@@ -213,12 +229,8 @@ if __name__ == "__main__":
             RESIZE_FACTOR=1.0
 
             if EVAL_PRERESIZE:
+                assert TEST_SIZE_W > 0 and TEST_SIZE_W > 0, "Invalid values for eval_preresize"
                 
-                if 'x' in EVAL_PRERESIZE:
-                    TEST_SIZE_H, TEST_SIZE_W = map(int,EVAL_PRERESIZE.split("x"))
-                else:
-                    TEST_SIZE_H = TEST_SIZE_W = int(EVAL_PRERESIZE)
-
                 transform.append(
                     {
                         'name': 'Resize',
