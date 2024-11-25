@@ -57,7 +57,8 @@ if __name__ == "__main__":
 
     DISPLAY_TO_FILE = args.get("display_to_file")
 
-    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}","results.pkl")
+    OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "eval_size=512x512", "results.pkl")
+    #OUTPUT_RESULT = os.path.join(EVAL_FOLDER,f"{EVAL_TYPE}_results{EVAL_EPOCH}", "results.pkl")
 
     if EVAL_CROPPED:
         OUTPUT_RESULT = OUTPUT_RESULT.replace("results.pkl","results_cropped_img.pkl")
@@ -326,7 +327,15 @@ if __name__ == "__main__":
                 kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
                 kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
 
+            if 'Resize' in sample:
+                resize_factors = sample['Resize']
+
+                kps = kps.reshape(-1,2)
                 
+                kps[:,0] = (kps[:,0]/ resize_factors[0] )/RESIZE_FACTOR
+                kps[:,1] = (kps[:,1]/ resize_factors[1] )/RESIZE_FACTOR
+
+
             results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
 
         

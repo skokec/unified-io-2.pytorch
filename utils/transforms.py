@@ -646,6 +646,9 @@ class Resize(T.Resize):
                 sample[k][1,:] *= resize_factor[1]
 
 
+        # save resize factor for future reference
+        sample['Resize'] = [self.size[1]/org_im_size[0], self.size[0]/org_im_size[1]]
+
 
         return sample
 
