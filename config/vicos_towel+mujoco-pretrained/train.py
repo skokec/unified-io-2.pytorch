@@ -31,9 +31,10 @@ args = dict(
 	n_epochs=10,
 
 	extra_str='',
+	aug_str='_fixedsize=384x384',
 
 	save_dir=os.path.join(OUTPUT_DIR, 'vicos_towel+mujoco-pretrained',
-						  'model={args[model][name]}_resize_factor={args[train_dataset][kwargs][resize_factor]}_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}_with_prompt_and_gt_randomization{args[extra_str]}',
+						  'model={args[model][name]}_resize_factor={args[train_dataset][kwargs][resize_factor]}_batchsize={args[train_dataset][batch_size]}_lr={args[model][lr]}_with_prompt_and_gt_randomization{args[aug_str]}{args[extra_str]}',
 						  'num_train_epoch={args[n_epochs]}', 
 						  'depth={args[train_dataset][kwargs][use_depth]}',
                           ),
@@ -74,6 +75,15 @@ args = dict(
 						#'keys': ('image', 'instance', 'label', 'ignore', 'orientation', 'mask') + (('depth',) if USE_DEPTH else ()),
 						#'type': (torch.FloatTensor, torch.ShortTensor, torch.ByteTensor, torch.ByteTensor, torch.FloatTensor, torch.ByteTensor) + ((torch.FloatTensor, ) if USE_DEPTH else ()),
                         'type': (torch.FloatTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor, torch.ByteTensor),
+					}
+				},
+				{
+					'name': 'Resize',
+					'opts': {
+						'keys': ('image','segmentation_mask', 'edge_mask', 'outer_edge_mask', 'inner_edge_mask'),
+						'interpolation': (InterpolationMode.BILINEAR, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST, InterpolationMode.NEAREST),
+						'keys_bbox': ('center',),
+						'size': (512, 512),
 					}
 				},
 				{
