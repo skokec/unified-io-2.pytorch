@@ -191,9 +191,13 @@ class InputImageViTEncoder(ModalityEncoder):
       return {}
 
     PATCH_SIZE = config.IMAGE_INPUT_D if self.cfg is None else self.cfg.t5_config.image_vit_patch_size
-    image_input_size = config.IMAGE_INPUT_SIZE if self.cfg is None else self.cfg.t5_config.default_image_vit_size
+    image_input_size = config.IMAGE_INPUT_SIZE if self.cfg is None else (self.cfg.t5_config.default_image_vit_size if self.cfg.use_image_vit else self.cfg.t5_config.default_image_size)
     input_padding_size = np.array(image_input_size, dtype=np.int32) // PATCH_SIZE
     n_patches = np.prod(input_padding_size)
+
+    print("PATCH_SIZE: ", PATCH_SIZE)
+    print("image_samples: ", sequence_length.get('image_input_samples', None))
+    print("image_input_size: ", image_input_size)
 
     image_samples = sequence_length.get('image_input_samples', None)
     if image_samples is None:

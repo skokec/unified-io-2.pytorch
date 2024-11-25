@@ -264,7 +264,7 @@ class TaskRunner:
     full_config = self.model.full_config
 
     self.input_image_size = config.IMAGE_INPUT_SIZE
-    if self.cfg is not None:
+    if full_config is not None:
       self.input_image_size = full_config.t5_config.default_image_vit_size if full_config.use_image_vit else full_config.t5_config.default_image_size
 
   @property

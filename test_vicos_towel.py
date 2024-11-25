@@ -80,16 +80,20 @@ if __name__ == "__main__":
                 model_cfg_overrides['t5_config'] = dict()
             if 'sequence_length' not in model_cfg_overrides:
                 model_cfg_overrides['sequence_length'] = dict()
-            if 'cfg_overrides' not in preprocessor_kwargs:
-                preprocessor_kwargs['cfg_overrides'] = dict()
-            if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
-                preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
 
             from uio2 import config
 
             model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
             model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
 
+            if 'cfg_overrides' not in preprocessor_kwargs:
+                preprocessor_kwargs['cfg_overrides'] = dict()
+            if 'sequence_length' not in preprocessor_kwargs['cfg_overrides']:
+                preprocessor_kwargs['cfg_overrides']['sequence_length'] = dict()
+            if 't5_config' not in preprocessor_kwargs['cfg_overrides']:
+                preprocessor_kwargs['cfg_overrides']['t5_config'] = dict()
+
+            preprocessor_kwargs['cfg_overrides']['t5_config']['default_image_vit_size'] = tuple(processing_size)
             preprocessor_kwargs['cfg_overrides']['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
         
         preprocessor = UnifiedIOPreprocessor.from_pretrained(args['model']['preprocessor'], **preprocessor_kwargs)
@@ -232,7 +236,7 @@ if __name__ == "__main__":
         db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=RESIZE_FACTOR, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
                           transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
 
-        db = KeypointPreprocessorDataset(preprocessor, db, full_config=model.full_config, returned_raw_sample=True, randomize_keypoints_order=False, apply_internal_scale_aug=True)
+        db = KeypointPreprocessorDataset(preprocessor, db, full_config=model.full_config, returned_raw_sample=True, randomize_keypoints_order=False, apply_internal_scale_aug=False)
         # prepare training data
         train_imgs = []
         train_prompts = []
@@ -244,7 +248,7 @@ if __name__ == "__main__":
 
         results = dict()
 
-        IMAGE_PROCESS_SIZE = model.config.image_vit_patch_size if model.full_config.use_image_vit else model.config.image_patch_size
+        IMAGE_PROCESS_SIZE = model.config.default_image_vit_size if model.full_config.use_image_vit else model.config.default_image_size
 
         for i,preeprocessed_sample in enumerate(tqdm(db)):
             #if i % 8 != 0:
@@ -267,7 +271,7 @@ if __name__ == "__main__":
             train_prompts.append(f"List coordinates of all visible towel corners in <image_input>: {gt_centers_text}")
             train_imgs.append(img)
 
-            kps, text = detect_keypoints(runner, np.transpose(img,(1,2,0)),
+            kps, text = detect_keypoints(runner, np.transpose(img,(1,2,0)), image_processed_size=IMAGE_PROCESS_SIZE,
                                          generation_config = GenerationConfig(
                                                                 do_sample=True,
                                                                 num_beams=5,
