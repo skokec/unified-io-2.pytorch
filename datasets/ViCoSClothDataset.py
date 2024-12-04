@@ -260,8 +260,9 @@ class ClothDataset(Dataset):
 			sample['center'][:centers.shape[0], :] = centers
 		sample['image'] = np.array(sample['image'])
 
-		if self.transform is not None:		
-			transform = my_transforms.get_transform(self.transform) if self.transform is not None and type(self.transform) == list else transform	
+		transform = my_transforms.get_transform(self.transform) if self.transform is not None and type(self.transform) == list else self.transform
+		if transform is not None:
+
 			import copy
 			do_transform = True
 
@@ -302,12 +303,13 @@ class ClothDataset(Dataset):
 				sample['image'] = torch.cat((sample['image'], sample['depth']))                     
 
 		if self.remove_out_of_bounds_centers:
+			im_size = [im_size[1],im_size[0]] if sample['image'] is not None else sample['image'].shape
 			# if instance has out-of-bounds center then ignore it if requested so
 			out_of_bounds_ids = [id for id, c in enumerate(sample['center'])
 							 # if center closer to border then this margin than mark it as truncated
 							 if id >= 0 and (c[0] < 0 or c[1] < 0 or
-											c[0] >= sample['image'].shape[-1] or
-											c[1] >= sample['image'].shape[-2])]
+											c[0] >= im_size[-1] or
+											c[1] >= im_size[-2])]
 			for id in out_of_bounds_ids:
 				sample['center'][id,:] = -1
 
