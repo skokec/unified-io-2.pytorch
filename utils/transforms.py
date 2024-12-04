@@ -861,7 +861,7 @@ class ToTensor(object):
                     sample[k] = sample[k]*255
 
             elif not isinstance(sample[k],torch.Tensor):
-                raise Exception("Invalid data format: must be PIL Image, numpy array or pytorch Tensor")
+                raise Exception("Invalid data format: must be PIL Image, numpy array or pytorch Tensor but found %s" % type(sample[k]))
 
             sample[k] = sample[k].type(t)
 
