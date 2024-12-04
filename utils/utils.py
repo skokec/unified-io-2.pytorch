@@ -80,6 +80,152 @@ class Logger:
                 canvas.start_event_loop(interval)
                 return
 
+
+####################################################################################################################
+# General class that can merge split image results - can merge tensor data (image or heatmap) and points
+class ImageGridCombiner:
+    class Data:
+        def __init__(self, w,h):
+            self.full_size = [h,w]
+            self.full_data = dict()
+            self.image_names = []
+        def add_image_name(self, name):
+            self.image_names.append(name)
+
+        def get_image_name(self):
+            org_names = ["_patch".join(n.split("_patch")[:-1]) + os.path.splitext(n)[1] for n in self.image_names]
+            # check that all images had the same original name
+            org_names = np.unique(org_names)
+
+            if len(org_names) != 1:
+                raise Exception("Invalid original names found: %s" % ",".join(org_names))
+
+            return org_names[0]
+
+        def set_tensor2d(self, name, partial_data, roi_x, roi_y, merge_op=None):
+            if name not in self.full_data:
+                # store data on CPU for large images to avoid excesive memory usage
+                dev = partial_data.device if np.prod(self.full_size) < 2500*2500 else 'cpu'
+                self.full_data[name] = torch.zeros(list(partial_data.shape[:-2]) + self.full_size, dtype=partial_data.dtype,
+                                                   device=dev)
+
+            full_data_roi = self.full_data[name][..., roi_y[0]:roi_y[1], roi_x[0]:roi_x[1]]
+            partial_data_roi = partial_data[..., 0:(roi_y[1] - roi_y[0]),0:(roi_x[1] - roi_x[0])].type(full_data_roi.dtype)
+            try:
+                # default merge operator is to use max unless specified otherwise
+                if merge_op is None:
+                    merge_op = lambda Y,X: torch.where(Y.abs() < X.abs(), X, Y)
+
+                self.full_data[name][..., roi_y[0]:roi_y[1], roi_x[0]:roi_x[1]] = merge_op(full_data_roi, partial_data_roi.to(self.full_data[name].device))
+            except:
+                print('error')
+
+        def set_instance_description(self, name, partial_instance_list, partial_instance_mask, reverse_desc, x, y):
+            if name not in self.full_data:
+                self.full_data[name] = ([],[])
+
+            if len(partial_instance_list) > 0:
+                if np.all([i != 0 for i,desc in partial_instance_list.items()]):
+                    all_ids = partial_instance_mask.nonzero().cpu().numpy()
+                    all_values = partial_instance_mask[all_ids[:,0],all_ids[:,1]].cpu().numpy()
+                else:
+                    all_ids, all_values = None, None
+                for i,desc in partial_instance_list.items():
+                    if all_ids is None or all_values is None:
+                        # revert to slower but more correct version
+                        i_mask = (partial_instance_mask == i).nonzero().cpu().numpy()
+                    else:
+                        i_mask = all_ids[all_values == i,:] if len(all_ids) > 0 else np.zeros((0,2))
+
+                    self.full_data[name][0].append(desc + np.array(([y,x] if reverse_desc else [x,y]) + [0]*(len(desc)-2)))
+                    self.full_data[name][1].append(i_mask + np.array([y, x]))
+
+        def get(self, data_names):
+            return [self.full_data.get(n) for n in data_names]
+
+        def get_instance_description(self, name, out_shape, out_mask_tensor, overlap_thr=0, merge_dist_thr=0):
+            instance_list, instance_mask_ids = self.full_data[name]
+
+            # clip mask ids to out_mask_tensor.shape
+            instance_mask_ids = [np.array([c for c in i_mask if c[0] >= 0 and c[1] >= 0 and c[0] < out_shape[0] and c[1] < out_shape[1]])
+                                        for i_mask in instance_mask_ids]
+
+            instance_indexes = [set(np.ravel_multi_index((np.array(i_mask)[:, 0], np.array(i_mask)[:, 1]), dims=out_shape)) if len(i_mask) > 0 else set()
+                                        for i_mask in instance_mask_ids]
+
+            retained = self._find_retained_instances(instance_indexes, overlap_thr)
+
+            if merge_dist_thr > 0:
+                for i, x_i in enumerate(instance_list):
+                    if retained[i]:
+                        for j, x_j in enumerate(instance_list):
+                            if j > i and retained[j]:
+                                dist = np.sqrt(np.sum(np.abs(x_i[:2]-x_j[:2])**2))
+                                if dist < merge_dist_thr:
+                                    retained[j] = False
+
+            instance_list = [x for i, x in enumerate(instance_list) if retained[i]]
+            instance_mask_ids = [x for i, x in enumerate(instance_mask_ids) if retained[i]]
+            instance_indexes = [x for i, x in enumerate(instance_indexes) if retained[i]]
+
+            instance_dict = {}
+            instance_indexes_dict = {}
+
+            for id, (i_center, i_mask, i_mask_indexes) in enumerate(zip(instance_list, instance_mask_ids, instance_indexes)):
+                i_mask_ids = torch.from_numpy(i_mask)
+                if len(i_mask_ids) > 0:
+                    if out_mask_tensor is not None:
+                        out_mask_tensor[(i_mask_ids[:, 0], i_mask_ids[:, 1])] = id + 1
+                instance_dict[id + 1] = i_center
+                instance_indexes_dict[id+1] = list(i_mask_indexes)
+
+            return instance_dict, out_mask_tensor, instance_indexes_dict
+
+        def _find_retained_instances(self, instance_indexes, overlap_thr):
+            retained = np.ones(shape=len(instance_indexes), dtype=bool)
+            for i in range(len(instance_indexes)):
+                if retained[i]:
+                    for j in range(i + 1, len(instance_indexes)):
+                        inter_ij = len(instance_indexes[i].intersection(instance_indexes[j]))
+                        iou_ratio = inter_ij / (len(instance_indexes[i]) + len(instance_indexes[j]) - inter_ij + 1e-5)
+                        if iou_ratio > overlap_thr:
+                            if len(instance_indexes[i]) > len(instance_indexes[j]):
+                                retained[j] = False
+                            else:
+                                retained[i] = False
+                                break
+            return retained
+    def __init__(self):
+        self.current_index = None
+        self.current_data = None
+
+    def add_image(self, im_name, grid_index, data_map_tensor, data_map_instance_desc, custom_merge_ops={}):
+        n, x, y, w, h, org_w, org_h = grid_index
+
+        # set roi and clamp to max size
+        roi_x = x, min(x + w, org_w)
+        roi_y = y, min(y + h, org_h)
+
+        finished_data = None
+
+        if self.current_index is None or n != self.current_index:
+            finished_data = self.current_data
+            self.current_data = self.Data(org_w, org_h)
+            self.current_index = n
+
+        self.current_data.add_image_name(im_name)
+
+        if n == self.current_index:
+            for name,partial_data in data_map_tensor.items():
+                if partial_data is not None:
+                    self.current_data.set_tensor2d(name, partial_data, roi_x, roi_y, merge_op=custom_merge_ops.get(name))
+
+            for name,partial_data in data_map_instance_desc.items():
+                if partial_data is not None:
+                    self.current_data.set_instance_description(name, partial_data[0], partial_data[1], partial_data[2], x,y)
+
+        return finished_data
+
 from torch.nn.utils.rnn import pad_sequence
 import re
 import collections
