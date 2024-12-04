@@ -40,6 +40,14 @@ def centers_to_tokens(gt_centers, img_shape):
     return gt_centers_text
 
 
+def parse_img_size_arg(val):
+    if 'x' in EVAL_PRERESIZE:
+        h, w = map(int,val.split("x"))
+    else:
+        h = w = int(val)
+    return h, w
+
+
 if __name__ == "__main__":
 
     args = get_config_args()
@@ -52,14 +60,15 @@ if __name__ == "__main__":
     EVAL_TYPE = args['eval_type']
     EVAL_EPOCH = args['eval_epoch']
     EVAL_CROPPED = args.get('eval_cropped')
+    EVAL_SW_STEP = args.get('eval_sliding_window_step')
     SKIP_IF_EXISTS = args.get('skip_if_exists')
     EVAL_PRERESIZE = args.get('eval_preresize')
     
     if EVAL_PRERESIZE:
-        if 'x' in EVAL_PRERESIZE:
-            TEST_SIZE_H, TEST_SIZE_W = map(int,EVAL_PRERESIZE.split("x"))
-        else:
-            TEST_SIZE_H = TEST_SIZE_W = int(EVAL_PRERESIZE)
+        TEST_SIZE_H, TEST_SIZE_W = parse_img_size_arg(EVAL_PRERESIZE)
+
+    if EVAL_SW_STEP:
+        TEST_STEP_H, TEST_STEP_W = parse_img_size_arg(EVAL_SW_STEP)
 
     DISPLAY_TO_FILE = args.get("display_to_file")
     
@@ -81,7 +90,7 @@ if __name__ == "__main__":
         from uio2 import config
 
         model_cfg_overrides['t5_config']['default_image_vit_size'] = tuple(processing_size)
-        model_cfg_overrides['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
+        #model_cfg_overrides['t5_config']['encoder_max_image_length'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
         model_cfg_overrides['sequence_length']['image_input_samples'] = (processing_size[0]//config.IMAGE_INPUT_D)*(processing_size[1]//config.IMAGE_INPUT_D)
         
 
@@ -101,6 +110,10 @@ if __name__ == "__main__":
     if EVAL_PRERESIZE:
         OUTPUT_RESULT_DIR = os.path.join(OUTPUT_RESULT_DIR, f"preresize_size={TEST_SIZE_H}x{TEST_SIZE_W}")
 
+    if EVAL_SW_STEP:
+        assert EVAL_PRERESIZE, "Missing 'eval_preresize' when enabling sliding window!"
+
+        OUTPUT_RESULT_DIR = os.path.join(OUTPUT_RESULT_DIR, f"sliding_window_step={TEST_STEP_H}x{TEST_STEP_W}")
 
     if EVAL_CROPPED:
         OUTPUT_RESULT = os.path.join(OUTPUT_RESULT_DIR, "results_cropped_img.pkl")
@@ -226,7 +239,8 @@ if __name__ == "__main__":
                 }
                 })
         else:
-            RESIZE_FACTOR=1.0
+            #RESIZE_FACTOR=1.0
+            RESIZE_FACTOR=0.5
 
             if EVAL_PRERESIZE:
                 assert TEST_SIZE_W > 0 and TEST_SIZE_W > 0, "Invalid values for eval_preresize"
@@ -246,7 +260,15 @@ if __name__ == "__main__":
         #CLOTH_DATASET_VICOS = '/storage/local/ssd/cache/ClothDatasetVICOS/'
         CLOTH_DATASET_VICOS = os.environ.get('VICOS_TOWEL_DATASET')
         db = ClothDataset(root_dir=CLOTH_DATASET_VICOS, resize_factor=RESIZE_FACTOR, transform_only_valid_centers=1.0, transform_per_sample_rng=False,
-                          transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test)
+                          transform=transform, segment_cloth=USE_SEGMENTATION, use_depth=USE_DEPTH, correct_depth_rotation=False, subfolders=subfolders_train if EVAL_TYPE == "train" else subfolders_test,
+                          #valid_img_names=['bg=red_tablecloth/cloth=checkered_rag_small/rgb/image_0000_view0_',]
+                          )
+
+
+        if EVAL_SW_STEP:
+            from datasets.PatchSplitDataset import PatchSplitDataset
+            db = PatchSplitDataset(db, patch_image_size=(TEST_SIZE_W,TEST_SIZE_H), patch_steps=(TEST_STEP_W,TEST_STEP_H))
+
 
         db = KeypointPreprocessorDataset(preprocessor, db, full_config=model.full_config, returned_raw_sample=True, randomize_keypoints_order=False, apply_internal_scale_aug=False)
         # prepare training data
@@ -262,9 +284,33 @@ if __name__ == "__main__":
 
         IMAGE_PROCESS_SIZE = model.config.default_image_vit_size if model.full_config.use_image_vit else model.config.default_image_size
 
+        from utils.utils import ImageGridCombiner
+        
+        grid_combiner = ImageGridCombiner()
+        grid_index = None
+
+        def merge_patch_results(data):
+
+            predictions_merge_thr=0.5
+            predictions_merge_dist_thr=10
+    
+            im_name = data.get_image_name()
+            im_shape = data.full_size
+
+            kps, _, _ = data.get_instance_description('predictions', im_shape, out_mask_tensor=None,
+                                                        overlap_thr=predictions_merge_thr,
+                                                        merge_dist_thr=predictions_merge_dist_thr)
+            if len(kps) > 0:
+                num_cols = kps[list(kps.keys())[0]].shape[0]
+                kps = np.array([kps[k] if k in kps else np.zeros((num_cols,)) for k in range(max(kps.keys())+1) if k > 0])
+            else:
+                kps = np.zeros((0,2))
+
+            return kps, im_name
+
+
         for i,preeprocessed_sample in enumerate(tqdm(db)):
-            #if i % 8 != 0:
-            #    continue
+            
             sample = preeprocessed_sample['sample']
             img = np.array(sample['image'])
             center = sample['center']
@@ -294,8 +340,11 @@ if __name__ == "__main__":
                                                                 # warning from GenerationMixin so we just tell it 1 to keep it quiet
                                                                 pad_token_id=1,
                                                             ))
+            
+            im_name = sample['im_name']
+
             if PLOT:
-                print(sample['im_name'])
+                print(im_name)
                 print("gt:", train_prompts[-1])
                 print(gt_centers)
                 print("prediction:", text)
@@ -332,7 +381,7 @@ if __name__ == "__main__":
                     cv2.drawMarker(img_copy, (int(pt[0]), int(pt[1])), color=(255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=10, thickness=2)
 
                 os.makedirs(os.path.join(os.path.dirname(OUTPUT_RESULT),"plot_cropped" if EVAL_CROPPED else "plot"), exist_ok=True)
-                cv2.imwrite(os.path.join(os.path.dirname(OUTPUT_RESULT),"plot_cropped" if EVAL_CROPPED else "plot", sample['im_name'].replace(CLOTH_DATASET_VICOS,"").replace("/",".")), img_copy)
+                cv2.imwrite(os.path.join(os.path.dirname(OUTPUT_RESULT),"plot_cropped" if EVAL_CROPPED else "plot", im_name.replace(CLOTH_DATASET_VICOS,"").replace("/",".")), img_copy)
 
             if 'RandomCrop' in sample:
                 params, pad_size = sample['RandomCrop']
@@ -340,19 +389,50 @@ if __name__ == "__main__":
                 # params = (dx,dy, th, tw)
                 kps = kps.reshape(-1,2)
                 
-                kps[:,0] = (kps[:,0] + params[1] - pad_size[0])/RESIZE_FACTOR
-                kps[:,1] = (kps[:,1] + params[0] - pad_size[1])/RESIZE_FACTOR
+                kps[:,0] = (kps[:,0] + params[1] - pad_size[0])
+                kps[:,1] = (kps[:,1] + params[0] - pad_size[1])
 
             if 'Resize' in sample:
                 resize_factors = sample['Resize']
 
                 kps = kps.reshape(-1,2)
                 
-                kps[:,0] = (kps[:,0]/ resize_factors[0] )/RESIZE_FACTOR
-                kps[:,1] = (kps[:,1]/ resize_factors[1] )/RESIZE_FACTOR
+                kps[:,0] = (kps[:,0]/ resize_factors[0] )
+                kps[:,1] = (kps[:,1]/ resize_factors[1] )
 
 
-            results[sample['im_name'].replace(CLOTH_DATASET_VICOS,"")] = kps
+            if 'grid_index' in sample:
+                grid_index = sample['grid_index']
+
+                pred = {i + 1: pred for i, pred in enumerate(kps)}
+                pred_mask = torch.zeros((img.shape[0], img.shape[1]), dtype=torch.uint8)
+
+
+                M = 2
+                for i,p in pred.items():
+                    pred_mask[int(p[1] - M):int(p[1] + M), int(p[0] - M):int(p[0] + M)] = i
+
+                # send data to grid_combiner for merging
+                # when new index is detected it will merge and return previously collected data
+                finished_image = grid_combiner.add_image(sample['im_name'],
+                                                         grid_index,
+                                                         data_map_tensor={},
+                                                         data_map_instance_desc=dict(predictions=(pred, pred_mask, False)))
+
+                # if this is final image then extract merged result and return it
+                if finished_image is not None:
+                    kps, im_name = merge_patch_results(finished_image)                   
+
+                else:
+                    continue
+                        
+            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = kps/RESIZE_FACTOR
+
+        # need to additionally handle last sample when in patch-split
+        if grid_index is not None:
+            kps, im_name = merge_patch_results(grid_combiner.current_data)
+            
+            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = kps/RESIZE_FACTOR
 
         
         os.makedirs(os.path.dirname(OUTPUT_RESULT), exist_ok=True)
