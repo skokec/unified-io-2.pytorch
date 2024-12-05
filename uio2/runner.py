@@ -290,6 +290,97 @@ class TaskRunner:
     else:
       return tokens
 
+  def keypoint_list_with_scores(self, example, image_processed_size, max_tokens, **gen_args):
+
+    out = self.model.generate(
+      batch=self.singleton_batch(example), modality="text",
+      use_cache=True, max_new_tokens=max_tokens,
+      output_scores=True,  return_dict_in_generate=True,
+      **gen_args
+    )
+
+    tokens = out[0][0].cpu()
+    text = self.tokenizer.decode(tokens)
+
+
+    # find IDs of tokens that represent image location min and max values
+    LOC_EXTRA_BEGIN = 200
+    LOC_EXTRA_END = 1199
+
+    LOC_BOUND_TOKENS = self.tokenizer.encode(f'<extra_id_{LOC_EXTRA_BEGIN}> <extra_id_{LOC_EXTRA_END}>')
+    LOC_BOUND_REVERSED = False
+    # get min/max if tokens are encoded in reverse order
+    if LOC_BOUND_TOKENS[0] > LOC_BOUND_TOKENS[1]:
+      LOC_BOUND_TOKENS = [min(LOC_BOUND_TOKENS), max(LOC_BOUND_TOKENS)]
+      LOC_BOUND_REVERSED = True
+
+    # search for two consecative tokens that are within LOC_BOUND_TOKENS as a valid keypoint
+    points, points_idx = [], []
+    for i in range(len(tokens)-1):
+      ids = (int(tokens[i]), int(tokens[i+1]))
+      if all(LOC_BOUND_TOKENS[0] <= x <= LOC_BOUND_TOKENS[1] for x in ids):
+        # found valid keypoint - save it
+        points.append(ids)
+
+        # also save its corresponding token positions in output (so that we can find its score)
+        points_idx.append((i-1,i))
+
+    if len(points) > 0:
+      points = np.array(points)
+      if LOC_BOUND_REVERSED:
+        kps = LOC_BOUND_TOKENS[1] - points # reverse location i.e, locations are LOC_BOUND_TOKENS.max() - points
+      else:
+        kps = points - LOC_BOUND_TOKENS[0] # get relative to first token
+
+      # convert points from relative token ids to floats
+      kps = kps / (LOC_EXTRA_END - LOC_EXTRA_BEGIN)
+      # scale with processed image size
+      kps *= image_processed_size[0]
+      
+      # then reverse image preprocessing transformation
+      kps = undo_box_preprocessing(np.tile(kps, [1, 2]), example["/meta/image_info"])[:, :2]
+      kps = kps[:, ::-1]  # convert to xy
+
+      # find scores for each location
+      points_idx = np.array(points_idx)
+      from transformers.generation import BeamSampleDecoderOnlyOutput, BeamSampleEncoderDecoderOutput, BeamSearchDecoderOnlyOutput, BeamSearchEncoderDecoderOutput
+      if type(out) in [BeamSampleDecoderOnlyOutput, BeamSampleEncoderDecoderOutput, BeamSearchDecoderOnlyOutput, BeamSearchEncoderDecoderOutput]:
+        
+        # scores are normaliued logits - convert them to probabiliteis 
+        scores = [torch.exp(out.scores[i][out.beam_indices[0,i]][tokens[i+1]]).item() for i in points_idx.reshape(-1)]
+        
+        # DEBUG:
+        #for i in points_idx.reshape(-1):
+        #  if out.scores[i][out.beam_indices[0,i]].argmax() != tokens[i+1]:
+        #    print(f"max score loc {out.scores[i][out.beam_indices[0,i]].argmax()} and token {tokens[i+1]} do not match")
+      else:
+
+        scores = []
+        for i in points_idx.reshape(-1):
+          
+          # scores are raw logits - convert them to probabiliteis and normalize them with values within valid location tokens
+          sum_val = torch.exp(out.scores[i][0][LOC_BOUND_TOKENS[0]:LOC_BOUND_TOKENS[1]+1]).sum()
+          prob = torch.exp(out.scores[i][0])/sum_val
+
+          #scores.append(prob[tokens[i+1]].item())
+          # do not take score relative to all positions but only realtive to 2 neighbooring values
+          scores.append((prob[tokens[i+1]]/prob[tokens[i+1]-1:tokens[i+1]+2].sum()).item())
+
+        # DEBUG:
+        #for i in points_idx.reshape(-1):
+        #  if out.scores[i][0].argmax() != tokens[i+1]:
+        #    print(f"max score loc {out.scores[i][0].argmax()} and token {tokens[i+1]} do not match")
+
+
+      scores = np.array(scores)
+      scores = scores.reshape(kps.shape)
+    else:
+      kps = np.array([])
+      scores = np.array([])
+
+    return kps, scores, text
+    
+
   def refexp(self, image, expression) -> List[float]:
     """Perform referring expression
 
