@@ -20,10 +20,10 @@ import numpy as np
 def detect_keypoints(runner, img_filename, image_processed_size, **kwargs):
     p = "List coordinates of all visible towel corners"
     example = runner.uio2_preprocessor(text_inputs=p, image_inputs=img_filename, target_modality="text")
-    text = runner.predict_text(example, max_tokens=32, detokenize=True, logits_processor=None, **kwargs)
-    kps = extract_individual_keypoints(text, example["/meta/image_info"], image_processed_size)
     
-    return kps, text
+    kps, scores, text = runner.keypoint_list_with_scores(example, image_processed_size,  max_tokens=32, **kwargs)
+    
+    return kps, scores, text
 
 
 def centers_to_tokens(gt_centers, img_shape):
@@ -51,6 +51,15 @@ def parse_img_size_arg(val):
 if __name__ == "__main__":
 
     args = get_config_args()
+
+    if args.get('attach_debug'):
+        import ptvsd
+
+        # Allow other computers to attach to the debugger
+        ptvsd.enable_attach(address=('0.0.0.0', args['attach_debug']))
+        print(f"Waiting for debugger attach at port {args['attach_debug']}...")
+        ptvsd.wait_for_attach()
+
 
     PLOT = False
 
@@ -304,7 +313,7 @@ if __name__ == "__main__":
                 num_cols = kps[list(kps.keys())[0]].shape[0]
                 kps = np.array([kps[k] if k in kps else np.zeros((num_cols,)) for k in range(max(kps.keys())+1) if k > 0])
             else:
-                kps = np.zeros((0,2))
+                kps = np.zeros((0,4))
 
             return kps, im_name
 
@@ -329,10 +338,10 @@ if __name__ == "__main__":
             train_prompts.append(f"List coordinates of all visible towel corners in <image_input>: {gt_centers_text}")
             train_imgs.append(img)
 
-            kps, text = detect_keypoints(runner, np.transpose(img,(1,2,0)), image_processed_size=IMAGE_PROCESS_SIZE,
-                                         generation_config = GenerationConfig(
-                                                                do_sample=True,
-                                                                num_beams=5,
+            kps, scores, text = detect_keypoints(runner, np.transpose(img,(1,2,0)), image_processed_size=IMAGE_PROCESS_SIZE,
+                                                 generation_config = GenerationConfig(                                                                
+                                                                #do_sample=True,
+                                                                #num_beams=5,
                                                                 max_length=None,  # Avoid warning about preferring max_new_tokens
                                                                 bos_token_id=0,
                                                                 eos_token_id=1,
@@ -404,7 +413,7 @@ if __name__ == "__main__":
             if 'grid_index' in sample:
                 grid_index = sample['grid_index']
 
-                pred = {i + 1: pred for i, pred in enumerate(kps)}
+                pred = {i + 1: np.concatenate([pred, scores[i]],axis=0) for i, pred in enumerate(kps)}
                 pred_mask = torch.zeros((img.shape[0], img.shape[1]), dtype=torch.uint8)
 
 
@@ -422,17 +431,18 @@ if __name__ == "__main__":
                 # if this is final image then extract merged result and return it
                 if finished_image is not None:
                     kps, im_name = merge_patch_results(finished_image)                   
-
+                    kps, scores = kps[:,:2], kps[:,2:]
                 else:
                     continue
                         
-            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = kps/RESIZE_FACTOR
+            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = np.concatenate((kps/RESIZE_FACTOR, scores),axis=1)
 
         # need to additionally handle last sample when in patch-split
         if grid_index is not None:
             kps, im_name = merge_patch_results(grid_combiner.current_data)
-            
-            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = kps/RESIZE_FACTOR
+            kps, scores = kps[:,:2], kps[:,2:]
+
+            results[im_name.replace(CLOTH_DATASET_VICOS,"")] = np.concatenate((kps/RESIZE_FACTOR, scores),axis=1)
 
         
         os.makedirs(os.path.dirname(OUTPUT_RESULT), exist_ok=True)
